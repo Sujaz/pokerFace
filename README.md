@@ -43,3 +43,7 @@ You can also run the tracker in a container using the provided `Dockerfile`.
    On Windows PowerShell, use `${PWD}` instead of `$(pwd)` for the bind mount path.
 
 With the container running, browse to http://localhost:3000 to access the app. All session data remains in your mounted `data` directory so historical results survive container restarts.
+
+## Branching
+
+All development now lives on the `main` branch. Previous working branches have been consolidated so you can pull directly from `main` to receive the latest tracker updates.
