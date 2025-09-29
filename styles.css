@@ -339,8 +339,8 @@ tbody tr:hover {
 }
 
 #table-delta.alert {
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.16);
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.18);
   padding: 0.3rem 0.6rem;
   border-radius: 8px;
   display: inline-block;
@@ -350,6 +350,45 @@ tbody tr:hover {
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.scoreboard-header {
+  align-items: flex-start;
+}
+
+.scoreboard-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.scoreboard-filters label {
+  min-width: 140px;
+}
+
+.scoreboard-leaders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.scoreboard-leaders .summary-card {
+  height: 100%;
+}
+
+.scoreboard-leaders .metric {
+  font-size: 1.4rem;
+}
+
+#scoreboard-table .empty {
+  text-align: center;
+  color: var(--muted);
+}
+
+#scoreboard-note {
+  margin-top: 1rem;
 }
 
 .summary-card {
@@ -412,5 +451,13 @@ button:disabled {
   .settings-toggle {
     top: 1rem;
     left: 1rem;
+  }
+
+  .scoreboard-filters {
+    width: 100%;
+  }
+
+  .scoreboard-filters label {
+    flex: 1 1 140px;
   }
 }
