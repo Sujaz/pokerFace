@@ -46,9 +46,11 @@ const scoreboardWinsName = document.querySelector('#scoreboard-wins-name');
 const scoreboardWinsValue = document.querySelector('#scoreboard-wins-value');
 const scoreboardTableBody = document.querySelector('#scoreboard-table');
 const scoreboardNote = document.querySelector('#scoreboard-note');
-const scoreboardSummaryGain = document.querySelector('#scoreboard-summary-gain');
-const scoreboardSummaryLoss = document.querySelector('#scoreboard-summary-loss');
-const scoreboardSummaryRank = document.querySelector('#scoreboard-summary-rank');
+const scoreboardWinnerName = document.querySelector('#scoreboard-winner-name');
+const scoreboardWinnerValue = document.querySelector('#scoreboard-winner-value');
+const scoreboardLoserName = document.querySelector('#scoreboard-loser-name');
+const scoreboardLoserValue = document.querySelector('#scoreboard-loser-value');
+const scoreboardMoves = document.querySelector('#scoreboard-moves');
 
 const CURRENCY_SYMBOLS = {
   USD: '$',
@@ -635,16 +637,31 @@ function formatNetValue(value, currencyForScope) {
   return `${value.toFixed(2)} (mixed)`;
 }
 
+function renderScoreboardMovesMessage(message) {
+  if (!scoreboardMoves) return;
+  scoreboardMoves.innerHTML = '';
+  const placeholder = document.createElement('p');
+  placeholder.className = 'movement-empty';
+  placeholder.textContent = message;
+  scoreboardMoves.appendChild(placeholder);
+}
+
 function resetScoreboardSummary() {
-  if (scoreboardSummaryGain) {
-    scoreboardSummaryGain.textContent = 'Top earner: —';
+  if (scoreboardWinnerName) {
+    scoreboardWinnerName.textContent = '—';
   }
-  if (scoreboardSummaryLoss) {
-    scoreboardSummaryLoss.textContent = 'Biggest loss: —';
+  if (scoreboardWinnerValue) {
+    scoreboardWinnerValue.textContent = '—';
+    scoreboardWinnerValue.classList.remove('positive', 'negative');
   }
-  if (scoreboardSummaryRank) {
-    scoreboardSummaryRank.textContent = 'Rank changes: —';
+  if (scoreboardLoserName) {
+    scoreboardLoserName.textContent = '—';
   }
+  if (scoreboardLoserValue) {
+    scoreboardLoserValue.textContent = '—';
+    scoreboardLoserValue.classList.remove('positive', 'negative');
+  }
+  renderScoreboardMovesMessage('—');
 }
 
 function buildRankingsForSessions(selectedSessions) {
@@ -661,20 +678,22 @@ function buildRankingsForSessions(selectedSessions) {
 }
 
 function summarizeRankChanges(currentStats, previousData, previousLabel) {
-  if (!scoreboardSummaryRank) return;
+  if (!scoreboardMoves) return;
+
+  scoreboardMoves.innerHTML = '';
 
   if (!previousData) {
-    scoreboardSummaryRank.textContent = 'Rank changes: no prior scope to compare.';
+    renderScoreboardMovesMessage('No prior scope to compare.');
     return;
   }
 
   const previousRankings = previousData.rankings;
   if (!previousRankings || previousRankings.size === 0) {
-    scoreboardSummaryRank.textContent = `Rank changes vs ${previousLabel}: no comparable data.`;
+    renderScoreboardMovesMessage(`No comparable data for ${previousLabel}.`);
     return;
   }
 
-  const changes = [];
+  const movementBadges = [];
   const newcomers = [];
   const currentNames = new Set();
 
@@ -682,10 +701,13 @@ function summarizeRankChanges(currentStats, previousData, previousLabel) {
     currentNames.add(entry.name);
     const previousRank = previousRankings.get(entry.name);
     if (typeof previousRank === 'number') {
-      if (previousRank !== index + 1) {
-        const movement = previousRank - (index + 1);
-        const direction = movement > 0 ? '↑' : '↓';
-        changes.push(`${entry.name} ${direction}${Math.abs(movement)}`);
+      const delta = previousRank - (index + 1);
+      if (delta !== 0) {
+        movementBadges.push({
+          name: entry.name,
+          direction: delta > 0 ? 'up' : 'down',
+          steps: Math.abs(delta),
+        });
       }
     } else {
       newcomers.push(entry.name);
@@ -699,20 +721,55 @@ function summarizeRankChanges(currentStats, previousData, previousLabel) {
     }
   });
 
-  const parts = [];
-  if (changes.length > 0) {
-    parts.push(`${changes.length} (${changes.join(', ')})`);
-  } else {
-    parts.push('none');
-  }
-  if (newcomers.length > 0) {
-    parts.push(`New: ${newcomers.join(', ')}`);
-  }
-  if (departures.length > 0) {
-    parts.push(`Dropped: ${departures.join(', ')}`);
+  const summary = document.createElement('p');
+  summary.className = 'movement-summary';
+  summary.textContent = `Compared to ${previousLabel}:`;
+  scoreboardMoves.appendChild(summary);
+
+  if (movementBadges.length === 0 && newcomers.length === 0 && departures.length === 0) {
+    const noMovement = document.createElement('p');
+    noMovement.className = 'movement-empty';
+    noMovement.textContent = 'No movement on the leaderboard.';
+    scoreboardMoves.appendChild(noMovement);
+    return;
   }
 
-  scoreboardSummaryRank.textContent = `Rank changes vs ${previousLabel}: ${parts.join(' · ')}`;
+  if (movementBadges.length > 0) {
+    const movementRow = document.createElement('div');
+    movementRow.className = 'movement-row';
+    movementBadges.forEach((item) => {
+      const badge = document.createElement('span');
+      badge.className = `movement-badge ${item.direction === 'up' ? 'movement-up' : 'movement-down'}`;
+      const arrow = item.direction === 'up' ? '↑' : '↓';
+      badge.textContent = `${item.name} ${arrow}${item.steps}`;
+      movementRow.appendChild(badge);
+    });
+    scoreboardMoves.appendChild(movementRow);
+  }
+
+  if (newcomers.length > 0) {
+    const newcomersRow = document.createElement('div');
+    newcomersRow.className = 'movement-row';
+    newcomers.forEach((name) => {
+      const badge = document.createElement('span');
+      badge.className = 'movement-badge movement-neutral';
+      badge.textContent = `New: ${name}`;
+      newcomersRow.appendChild(badge);
+    });
+    scoreboardMoves.appendChild(newcomersRow);
+  }
+
+  if (departures.length > 0) {
+    const departuresRow = document.createElement('div');
+    departuresRow.className = 'movement-row';
+    departures.forEach((name) => {
+      const badge = document.createElement('span');
+      badge.className = 'movement-badge movement-out';
+      badge.textContent = `Out: ${name}`;
+      departuresRow.appendChild(badge);
+    });
+    scoreboardMoves.appendChild(departuresRow);
+  }
 }
 
 function updateScoreboard() {
@@ -773,6 +830,11 @@ function updateScoreboard() {
     scoreboardProfitValue.textContent = '—';
     scoreboardWinsName.textContent = '—';
     scoreboardWinsValue.textContent = '—';
+    if (scoreboardWinnerName) scoreboardWinnerName.textContent = '—';
+    if (scoreboardWinnerValue) scoreboardWinnerValue.textContent = '—';
+    if (scoreboardLoserName) scoreboardLoserName.textContent = '—';
+    if (scoreboardLoserValue) scoreboardLoserValue.textContent = '—';
+    renderScoreboardMovesMessage('No sessions recorded yet.');
     scoreboardNote.textContent =
       sessions.length === 0 ? 'No sessions recorded yet.' : 'No sessions available for the selected view.';
     return;
@@ -785,6 +847,11 @@ function updateScoreboard() {
     scoreboardProfitValue.textContent = '—';
     scoreboardWinsName.textContent = '—';
     scoreboardWinsValue.textContent = '—';
+    if (scoreboardWinnerName) scoreboardWinnerName.textContent = '—';
+    if (scoreboardWinnerValue) scoreboardWinnerValue.textContent = '—';
+    if (scoreboardLoserName) scoreboardLoserName.textContent = '—';
+    if (scoreboardLoserValue) scoreboardLoserValue.textContent = '—';
+    renderScoreboardMovesMessage(`${contextLabel || 'Selected view'} has no player data yet.`);
     scoreboardNote.textContent = `${contextLabel || 'Selected view'} has no player data yet.`;
     return;
   }
@@ -815,19 +882,31 @@ function updateScoreboard() {
     scoreboardWinsValue.textContent = '—';
   }
 
-  if (scoreboardSummaryGain && playerStats.length > 0) {
-    scoreboardSummaryGain.textContent = `Top earner: ${profitLeader.name} (${formatNetValue(
-      profitLeader.totalNet,
-      currencyForScope,
-    )})`;
+  if (scoreboardWinnerName) {
+    scoreboardWinnerName.textContent = profitLeader.name;
+  }
+  if (scoreboardWinnerValue) {
+    scoreboardWinnerValue.textContent = formatNetValue(profitLeader.totalNet, currencyForScope);
+    scoreboardWinnerValue.classList.remove('positive', 'negative');
+    if (profitLeader.totalNet > 0.0001) {
+      scoreboardWinnerValue.classList.add('positive');
+    } else if (profitLeader.totalNet < -0.0001) {
+      scoreboardWinnerValue.classList.add('negative');
+    }
   }
 
-  if (scoreboardSummaryLoss) {
-    const lowestPerformer = playerStats[playerStats.length - 1];
-    scoreboardSummaryLoss.textContent = `Biggest loss: ${lowestPerformer.name} (${formatNetValue(
-      lowestPerformer.totalNet,
-      currencyForScope,
-    )})`;
+  const lowestPerformer = playerStats[playerStats.length - 1];
+  if (scoreboardLoserName) {
+    scoreboardLoserName.textContent = lowestPerformer.name;
+  }
+  if (scoreboardLoserValue) {
+    scoreboardLoserValue.textContent = formatNetValue(lowestPerformer.totalNet, currencyForScope);
+    scoreboardLoserValue.classList.remove('positive', 'negative');
+    if (lowestPerformer.totalNet > 0.0001) {
+      scoreboardLoserValue.classList.add('positive');
+    } else if (lowestPerformer.totalNet < -0.0001) {
+      scoreboardLoserValue.classList.add('negative');
+    }
   }
 
   const previousData = comparisonSessions.length > 0 ? buildRankingsForSessions(comparisonSessions) : null;

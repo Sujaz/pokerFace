@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Poker Face Tracker</title>
+  <title>Texas Hold'em Tracker</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -77,8 +77,8 @@
   <main class="app">
     <header>
       <div>
-        <h1>Poker Night Tracker</h1>
-        <p class="subtitle">Track registrations, final cash, buy-ins, and table results for poker night.</p>
+        <h1>Texas Hold'em Night Tracker</h1>
+        <p class="subtitle">Run the table with live chip counts, buy-ins, and final tallies for every Hold'em session.</p>
       </div>
       <div class="session-status" id="session-status-indicator">Session open</div>
     </header>
@@ -204,9 +204,22 @@
         </article>
       </div>
       <div class="scoreboard-summary" role="list">
-        <p id="scoreboard-summary-gain" role="listitem">Top earner: —</p>
-        <p id="scoreboard-summary-loss" role="listitem">Biggest loss: —</p>
-        <p id="scoreboard-summary-rank" role="listitem">Rank changes: —</p>
+        <article class="summary-brick" role="listitem">
+          <h3>Big Winner</h3>
+          <p id="scoreboard-winner-name" class="metric">—</p>
+          <p id="scoreboard-winner-value" class="detail">—</p>
+        </article>
+        <article class="summary-brick" role="listitem">
+          <h3>Tough Night</h3>
+          <p id="scoreboard-loser-name" class="metric">—</p>
+          <p id="scoreboard-loser-value" class="detail">—</p>
+        </article>
+        <article class="summary-brick" role="listitem">
+          <h3>Scoreboard Moves</h3>
+          <div id="scoreboard-moves" class="movement-list" role="list">
+            <p class="movement-empty">—</p>
+          </div>
+        </article>
       </div>
       <div class="table-wrapper">
         <table>
