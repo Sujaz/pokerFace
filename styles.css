@@ -374,6 +374,22 @@ tbody tr:hover {
   margin-bottom: 1.25rem;
 }
 
+.scoreboard-summary {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.scoreboard-summary p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 .scoreboard-leaders .summary-card {
   height: 100%;
 }

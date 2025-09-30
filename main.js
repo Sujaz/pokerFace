@@ -46,6 +46,9 @@ const scoreboardWinsName = document.querySelector('#scoreboard-wins-name');
 const scoreboardWinsValue = document.querySelector('#scoreboard-wins-value');
 const scoreboardTableBody = document.querySelector('#scoreboard-table');
 const scoreboardNote = document.querySelector('#scoreboard-note');
+const scoreboardSummaryGain = document.querySelector('#scoreboard-summary-gain');
+const scoreboardSummaryLoss = document.querySelector('#scoreboard-summary-loss');
+const scoreboardSummaryRank = document.querySelector('#scoreboard-summary-rank');
 
 const CURRENCY_SYMBOLS = {
   USD: '$',
@@ -486,6 +489,26 @@ function getSessionYear(session) {
   return String(date.getFullYear());
 }
 
+function getSessionsSortedByDate() {
+  return [...sessions].sort((a, b) => {
+    const dateA = getSessionDate(a)?.getTime() ?? 0;
+    const dateB = getSessionDate(b)?.getTime() ?? 0;
+    return dateB - dateA;
+  });
+}
+
+function getSortedYears() {
+  const years = new Set();
+  sessions.forEach((session) => {
+    years.add(getSessionYear(session));
+  });
+  return Array.from(years).sort((a, b) => {
+    if (a === 'Unknown') return 1;
+    if (b === 'Unknown') return -1;
+    return Number(b) - Number(a);
+  });
+}
+
 function refreshScoreboardFilters() {
   if (!scoreboardScopeSelect) return;
 
@@ -494,11 +517,7 @@ function refreshScoreboardFilters() {
 
   if (scoreboardSessionSelect) {
     scoreboardSessionSelect.innerHTML = '';
-    const sortedSessions = [...sessions].sort((a, b) => {
-      const dateA = getSessionDate(a)?.getTime() ?? 0;
-      const dateB = getSessionDate(b)?.getTime() ?? 0;
-      return dateB - dateA;
-    });
+    const sortedSessions = getSessionsSortedByDate();
 
     sortedSessions.forEach((session) => {
       const option = document.createElement('option');
@@ -517,15 +536,7 @@ function refreshScoreboardFilters() {
 
   if (scoreboardYearSelect) {
     scoreboardYearSelect.innerHTML = '';
-    const years = new Set();
-    sessions.forEach((session) => {
-      years.add(getSessionYear(session));
-    });
-    const sortedYears = Array.from(years).sort((a, b) => {
-      if (a === 'Unknown') return 1;
-      if (b === 'Unknown') return -1;
-      return Number(b) - Number(a);
-    });
+    const sortedYears = getSortedYears();
     sortedYears.forEach((year) => {
       const option = document.createElement('option');
       option.value = year;
@@ -554,6 +565,15 @@ function handleScoreboardScopeChange() {
     scoreboardYearWrapper.hidden = scope !== 'year';
   }
   updateScoreboard();
+}
+
+function sortPlayerStatsByNet(stats) {
+  return [...stats].sort((a, b) => {
+    if (b.totalNet !== a.totalNet) {
+      return b.totalNet - a.totalNet;
+    }
+    return a.name.localeCompare(b.name);
+  });
 }
 
 function determineCurrencyForSessions(selectedSessions) {
@@ -607,12 +627,104 @@ function computePlayerStats(selectedSessions) {
   }));
 }
 
+function formatNetValue(value, currencyForScope) {
+  if (!Number.isFinite(value)) return '—';
+  if (currencyForScope) {
+    return formatCurrency(value, currencyForScope);
+  }
+  return `${value.toFixed(2)} (mixed)`;
+}
+
+function resetScoreboardSummary() {
+  if (scoreboardSummaryGain) {
+    scoreboardSummaryGain.textContent = 'Top earner: —';
+  }
+  if (scoreboardSummaryLoss) {
+    scoreboardSummaryLoss.textContent = 'Biggest loss: —';
+  }
+  if (scoreboardSummaryRank) {
+    scoreboardSummaryRank.textContent = 'Rank changes: —';
+  }
+}
+
+function buildRankingsForSessions(selectedSessions) {
+  const stats = computePlayerStats(selectedSessions);
+  if (stats.length === 0) {
+    return null;
+  }
+  const ordered = sortPlayerStatsByNet(stats);
+  const rankings = new Map();
+  ordered.forEach((entry, index) => {
+    rankings.set(entry.name, index + 1);
+  });
+  return { ordered, rankings };
+}
+
+function summarizeRankChanges(currentStats, previousData, previousLabel) {
+  if (!scoreboardSummaryRank) return;
+
+  if (!previousData) {
+    scoreboardSummaryRank.textContent = 'Rank changes: no prior scope to compare.';
+    return;
+  }
+
+  const previousRankings = previousData.rankings;
+  if (!previousRankings || previousRankings.size === 0) {
+    scoreboardSummaryRank.textContent = `Rank changes vs ${previousLabel}: no comparable data.`;
+    return;
+  }
+
+  const changes = [];
+  const newcomers = [];
+  const currentNames = new Set();
+
+  currentStats.forEach((entry, index) => {
+    currentNames.add(entry.name);
+    const previousRank = previousRankings.get(entry.name);
+    if (typeof previousRank === 'number') {
+      if (previousRank !== index + 1) {
+        const movement = previousRank - (index + 1);
+        const direction = movement > 0 ? '↑' : '↓';
+        changes.push(`${entry.name} ${direction}${Math.abs(movement)}`);
+      }
+    } else {
+      newcomers.push(entry.name);
+    }
+  });
+
+  const departures = [];
+  previousData.ordered.forEach((entry) => {
+    if (!currentNames.has(entry.name)) {
+      departures.push(entry.name);
+    }
+  });
+
+  const parts = [];
+  if (changes.length > 0) {
+    parts.push(`${changes.length} (${changes.join(', ')})`);
+  } else {
+    parts.push('none');
+  }
+  if (newcomers.length > 0) {
+    parts.push(`New: ${newcomers.join(', ')}`);
+  }
+  if (departures.length > 0) {
+    parts.push(`Dropped: ${departures.join(', ')}`);
+  }
+
+  scoreboardSummaryRank.textContent = `Rank changes vs ${previousLabel}: ${parts.join(' · ')}`;
+}
+
 function updateScoreboard() {
   if (!scoreboardTableBody || !scoreboardScopeSelect) return;
+
+  resetScoreboardSummary();
 
   const scope = scoreboardScopeSelect.value;
   let selectedSessions = [];
   let contextLabel = '';
+  let comparisonSessions = [];
+  let comparisonLabel = '';
 
   if (scope === 'session') {
     const sessionId = scoreboardSessionSelect?.value;
@@ -621,6 +733,16 @@ function updateScoreboard() {
       if (session) {
         selectedSessions = [session];
         contextLabel = formatSessionLabel(session);
+
+        const sortedSessions = getSessionsSortedByDate();
+        const currentIndex = sortedSessions.findIndex((item) => item.id === sessionId);
+        if (currentIndex !== -1) {
+          const previousSession = sortedSessions[currentIndex + 1];
+          if (previousSession) {
+            comparisonSessions = [previousSession];
+            comparisonLabel = formatSessionLabel(previousSession);
+          }
+        }
       }
     }
   } else if (scope === 'year') {
@@ -628,6 +750,17 @@ function updateScoreboard() {
     if (year) {
       selectedSessions = sessions.filter((session) => getSessionYear(session) === year);
       contextLabel = year === 'Unknown' ? 'Sessions without a set date' : `Year ${year}`;
+
+      const sortedYears = getSortedYears();
+      const currentIndex = sortedYears.indexOf(year);
+      if (currentIndex !== -1) {
+        const previousYear = sortedYears[currentIndex + 1];
+        if (previousYear) {
+          comparisonSessions = sessions.filter((session) => getSessionYear(session) === previousYear);
+          comparisonLabel =
+            previousYear === 'Unknown' ? 'Sessions without a set date' : `Year ${previousYear}`;
+        }
+      }
     }
   } else {
     selectedSessions = [...sessions];
@@ -640,11 +773,12 @@ function updateScoreboard() {
     scoreboardProfitValue.textContent = '—';
     scoreboardWinsName.textContent = '—';
     scoreboardWinsValue.textContent = '—';
-    scoreboardNote.textContent = sessions.length === 0 ? 'No sessions recorded yet.' : 'No sessions available for the selected view.';
+    scoreboardNote.textContent =
+      sessions.length === 0 ? 'No sessions recorded yet.' : 'No sessions available for the selected view.';
     return;
   }
 
-  const playerStats = computePlayerStats(selectedSessions);
+  const playerStats = sortPlayerStatsByNet(computePlayerStats(selectedSessions));
   if (playerStats.length === 0) {
     scoreboardTableBody.innerHTML = '<tr><td colspan="5" class="empty">No player results yet</td></tr>';
     scoreboardProfitName.textContent = '—';
@@ -655,20 +789,11 @@ function updateScoreboard() {
     return;
   }
 
-  playerStats.sort((a, b) => {
-    if (b.totalNet !== a.totalNet) {
-      return b.totalNet - a.totalNet;
-    }
-    return a.name.localeCompare(b.name);
-  });
-
   const currencyForScope = determineCurrencyForSessions(selectedSessions);
 
   const profitLeader = playerStats[0];
   scoreboardProfitName.textContent = profitLeader.name;
-  scoreboardProfitValue.textContent = currencyForScope
-    ? formatCurrency(profitLeader.totalNet, currencyForScope)
-    : `${profitLeader.totalNet.toFixed(2)} (mixed)`;
+  scoreboardProfitValue.textContent = formatNetValue(profitLeader.totalNet, currencyForScope);
 
   const winLeader = playerStats.reduce((best, candidate) => {
     if (!best) return candidate;
@@ -690,6 +815,24 @@ function updateScoreboard() {
     scoreboardWinsValue.textContent = '—';
   }
 
+  if (scoreboardSummaryGain && playerStats.length > 0) {
+    scoreboardSummaryGain.textContent = `Top earner: ${profitLeader.name} (${formatNetValue(
+      profitLeader.totalNet,
+      currencyForScope,
+    )})`;
+  }
+
+  if (scoreboardSummaryLoss) {
+    const lowestPerformer = playerStats[playerStats.length - 1];
+    scoreboardSummaryLoss.textContent = `Biggest loss: ${lowestPerformer.name} (${formatNetValue(
+      lowestPerformer.totalNet,
+      currencyForScope,
+    )})`;
+  }
+
+  const previousData = comparisonSessions.length > 0 ? buildRankingsForSessions(comparisonSessions) : null;
+  summarizeRankChanges(playerStats, previousData, comparisonLabel || 'previous scope');
+
   scoreboardTableBody.innerHTML = '';
   playerStats.forEach((entry) => {
     const row = document.createElement('tr');
@@ -698,7 +841,7 @@ function updateScoreboard() {
       String(entry.sessionsPlayed),
       String(entry.wins),
       String(entry.losses),
-      currencyForScope ? formatCurrency(entry.totalNet, currencyForScope) : `${entry.totalNet.toFixed(2)} (mixed)`,
+      formatNetValue(entry.totalNet, currencyForScope),
     ];
 
     values.forEach((value) => {
