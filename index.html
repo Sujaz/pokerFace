@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Poker Face Tracker</title>
+  <title>Texas Hold'em Tracker</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -65,7 +65,8 @@
       </section>
       <section aria-labelledby="admin-actions-heading">
         <h3 id="admin-actions-heading">Admin actions</h3>
-        <button id="reset-btn" class="ghost">Reset all data</button>
+        <button id="start-session-btn" class="primary">Start new session</button>
+        <button id="reset-btn" class="ghost">Clear current session</button>
         <p class="hint">Share this link so players can register: <span id="player-link"></span></p>
       </section>
     </div>
@@ -76,8 +77,8 @@
   <main class="app">
     <header>
       <div>
-        <h1>Poker Night Tracker</h1>
-        <p class="subtitle">Track registrations, final cash, buy-ins, and table results for poker night.</p>
+        <h1>Texas Hold'em Night Tracker</h1>
+        <p class="subtitle">Run the table with live chip counts, buy-ins, and final tallies for every Hold'em session.</p>
       </div>
       <div class="session-status" id="session-status-indicator">Session open</div>
     </header>
@@ -166,6 +167,79 @@
           <p id="wins-losses" class="metric">0 / 0</p>
         </article>
       </div>
+    </section>
+
+    <section class="card" aria-labelledby="scoreboard-heading">
+      <div class="section-header scoreboard-header">
+        <h2 id="scoreboard-heading">Scoreboard</h2>
+        <div class="scoreboard-filters">
+          <label>
+            Scope
+            <select id="scoreboard-scope">
+              <option value="session">Session</option>
+              <option value="year">Year</option>
+              <option value="all">All time</option>
+            </select>
+          </label>
+          <label id="scoreboard-session-wrapper">
+            Session
+            <select id="scoreboard-session"></select>
+          </label>
+          <label id="scoreboard-year-wrapper" hidden>
+            Year
+            <select id="scoreboard-year"></select>
+          </label>
+        </div>
+      </div>
+      <div class="scoreboard-leaders">
+        <article class="summary-card" role="listitem">
+          <h3>Top profit</h3>
+          <p id="scoreboard-profit-name" class="metric">—</p>
+          <p id="scoreboard-profit-value" class="hint">—</p>
+        </article>
+        <article class="summary-card" role="listitem">
+          <h3>Most wins</h3>
+          <p id="scoreboard-wins-name" class="metric">—</p>
+          <p id="scoreboard-wins-value" class="hint">—</p>
+        </article>
+      </div>
+      <div class="scoreboard-summary" role="list">
+        <article class="summary-brick" role="listitem">
+          <h3>Big Winner</h3>
+          <p id="scoreboard-winner-name" class="metric">—</p>
+          <p id="scoreboard-winner-value" class="detail">—</p>
+        </article>
+        <article class="summary-brick" role="listitem">
+          <h3>Tough Night</h3>
+          <p id="scoreboard-loser-name" class="metric">—</p>
+          <p id="scoreboard-loser-value" class="detail">—</p>
+        </article>
+        <article class="summary-brick" role="listitem">
+          <h3>Scoreboard Moves</h3>
+          <div id="scoreboard-moves" class="movement-list" role="list">
+            <p class="movement-empty">—</p>
+          </div>
+        </article>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Player</th>
+              <th scope="col">Sessions</th>
+              <th scope="col">Wins</th>
+              <th scope="col">Losses</th>
+              <th scope="col">Net</th>
+            </tr>
+          </thead>
+          <tbody id="scoreboard-table">
+            <tr>
+              <td colspan="5" class="empty">No results yet</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p id="scoreboard-note" class="hint"></p>
     </section>
   </main>
 

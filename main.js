@@ -1,3 +1,6 @@
+const API_BASE = '/api';
+const SAVE_DEBOUNCE_MS = 500;
+
 const settingsToggle = document.querySelector('#settings-toggle');
 const settingsPanel = document.querySelector('#settings-panel');
 const settingsOverlay = document.querySelector('#settings-overlay');
@@ -10,6 +13,7 @@ const expenseInput = document.querySelector('#table-expense');
 const reportedFinalInput = document.querySelector('#reported-final');
 const currencySelect = document.querySelector('#currency-select');
 const sessionStatusSelect = document.querySelector('#session-status');
+const startSessionBtn = document.querySelector('#start-session-btn');
 
 const addPlayerBtn = document.querySelector('#add-player-btn');
 const playersBody = document.querySelector('#players-body');
@@ -31,7 +35,23 @@ const displayDatetimeEl = document.querySelector('#display-datetime');
 const displayReportedFinalEl = document.querySelector('#display-reported-final');
 const displayExpensesEl = document.querySelector('#display-expenses');
 
-const STORAGE_KEY = 'poker-night-tracker';
+const scoreboardScopeSelect = document.querySelector('#scoreboard-scope');
+const scoreboardSessionWrapper = document.querySelector('#scoreboard-session-wrapper');
+const scoreboardYearWrapper = document.querySelector('#scoreboard-year-wrapper');
+const scoreboardSessionSelect = document.querySelector('#scoreboard-session');
+const scoreboardYearSelect = document.querySelector('#scoreboard-year');
+const scoreboardProfitName = document.querySelector('#scoreboard-profit-name');
+const scoreboardProfitValue = document.querySelector('#scoreboard-profit-value');
+const scoreboardWinsName = document.querySelector('#scoreboard-wins-name');
+const scoreboardWinsValue = document.querySelector('#scoreboard-wins-value');
+const scoreboardTableBody = document.querySelector('#scoreboard-table');
+const scoreboardNote = document.querySelector('#scoreboard-note');
+const scoreboardWinnerName = document.querySelector('#scoreboard-winner-name');
+const scoreboardWinnerValue = document.querySelector('#scoreboard-winner-value');
+const scoreboardLoserName = document.querySelector('#scoreboard-loser-name');
+const scoreboardLoserValue = document.querySelector('#scoreboard-loser-value');
+const scoreboardMoves = document.querySelector('#scoreboard-moves');
+
 const CURRENCY_SYMBOLS = {
   USD: '$',
   EUR: '€',
@@ -41,16 +61,25 @@ const CURRENCY_SYMBOLS = {
 const searchParams = new URLSearchParams(window.location.search);
 const isPlayerView = searchParams.get('role') === 'player';
 
-function getCurrencySymbol() {
-  return CURRENCY_SYMBOLS[currencySelect.value] ?? '$';
+let sessions = [];
+let currentSession = null;
+let isRestoring = false;
+let saveTimeoutId = null;
+
+function sanitizeCurrency(code) {
+  return code && code in CURRENCY_SYMBOLS ? code : 'USD';
 }
 
-function formatCurrency(value) {
+function getCurrencySymbol(code = currencySelect?.value) {
+  return CURRENCY_SYMBOLS[sanitizeCurrency(code)] ?? '$';
+}
+
+function formatCurrency(value, currencyCode = currencySelect?.value) {
   const number = Number(value) || 0;
-  const currency = currencySelect.value in CURRENCY_SYMBOLS ? currencySelect.value : 'USD';
+  const code = sanitizeCurrency(currencyCode);
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
-    currency,
+    currency: code,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(number);
@@ -66,7 +95,7 @@ function getPlayersData() {
     const buyins = Number(row.querySelector('.player-buyins').value) || 0;
     const final = Number(row.querySelector('.player-final').value) || 0;
     return {
-      id: row.dataset.id,
+      id: row.dataset.id || generateId(),
       name,
       buyins,
       final,
@@ -74,57 +103,91 @@ function getPlayersData() {
   });
 }
 
-function persistState() {
-  const state = {
+function collectCurrentSessionData() {
+  return {
+    id: currentSession?.id,
     settings: {
       hostName: hostNameInput.value,
       location: locationInput.value,
       datetime: datetimeInput.value,
       expenses: expenseInput.value,
       reportedFinal: reportedFinalInput.value,
-      currency: currencySelect.value,
-      sessionStatus: sessionStatusSelect.value,
+      currency: sanitizeCurrency(currencySelect.value),
+      sessionStatus: sessionStatusSelect.value === 'closed' ? 'closed' : 'open',
     },
     players: getPlayersData(),
   };
-
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-function restoreState() {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (!stored) return;
+function mergeCurrentSessionDraft() {
+  if (!currentSession) return;
+  const draft = collectCurrentSessionData();
+  currentSession = {
+    ...currentSession,
+    ...draft,
+    settings: {
+      ...currentSession.settings,
+      ...draft.settings,
+    },
+    players: draft.players,
+  };
+  const index = sessions.findIndex((session) => session.id === currentSession.id);
+  if (index !== -1) {
+    sessions[index] = currentSession;
+  } else {
+    sessions.push(currentSession);
+  }
+}
+
+async function saveSessionNow() {
+  if (!currentSession) return;
+  mergeCurrentSessionDraft();
+  refreshScoreboardFilters();
+  updateScoreboard();
 
   try {
-    const state = JSON.parse(stored);
-    const settings = state.settings ?? {};
-
-    hostNameInput.value = settings.hostName ?? '';
-    locationInput.value = settings.location ?? '';
-    datetimeInput.value = settings.datetime ?? '';
-    expenseInput.value = settings.expenses ?? '';
-    reportedFinalInput.value = settings.reportedFinal ?? '';
-
-    if (settings.currency && settings.currency in CURRENCY_SYMBOLS) {
-      currencySelect.value = settings.currency;
-    } else {
-      currencySelect.value = 'USD';
-    }
-
-    if (settings.sessionStatus === 'closed') {
-      sessionStatusSelect.value = 'closed';
-    } else {
-      sessionStatusSelect.value = 'open';
-    }
-
-    playersBody.innerHTML = '';
-    (state.players ?? []).forEach((player) => {
-      const row = createPlayerRow(player);
-      playersBody.appendChild(row);
+    const response = await fetch(`${API_BASE}/sessions/${currentSession.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(currentSession),
     });
+
+    if (!response.ok) {
+      throw new Error(`Failed to save session: ${response.status}`);
+    }
+
+    const updated = await response.json();
+    currentSession = updated;
+    const index = sessions.findIndex((session) => session.id === updated.id);
+    if (index !== -1) {
+      sessions[index] = updated;
+    } else {
+      sessions.push(updated);
+    }
+    refreshScoreboardFilters();
+    updateScoreboard();
   } catch (error) {
-    console.error('Failed to restore tracker state', error);
+    console.error(error);
   }
+}
+
+function scheduleSave(immediate = false) {
+  if (isRestoring || !currentSession) {
+    return;
+  }
+  if (saveTimeoutId) {
+    clearTimeout(saveTimeoutId);
+  }
+  if (immediate) {
+    saveSessionNow();
+    return;
+  }
+  saveTimeoutId = setTimeout(() => {
+    saveTimeoutId = null;
+    saveSessionNow();
+  }, SAVE_DEBOUNCE_MS);
 }
 
 function updateEventDetails() {
@@ -147,36 +210,6 @@ function updateEventDetails() {
 
   displayReportedFinalEl.textContent = formatCurrency(reportedFinalInput.value);
   displayExpensesEl.textContent = formatCurrency(expenseInput.value);
-}
-
-function updateSessionStatusUI() {
-  const isClosed = sessionStatusSelect.value === 'closed';
-  if (sessionStatusIndicator) {
-    sessionStatusIndicator.textContent = isClosed ? 'Session closed' : 'Session open';
-    sessionStatusIndicator.classList.toggle('closed', isClosed);
-  }
-
-  const disablePlayerInputs = isClosed;
-  playersBody.querySelectorAll('input').forEach((input) => {
-    input.disabled = disablePlayerInputs;
-  });
-  playersBody.querySelectorAll('.remove-player').forEach((button) => {
-    button.disabled = disablePlayerInputs;
-    button.classList.toggle('disabled', disablePlayerInputs);
-  });
-
-  if (addPlayerBtn) {
-    addPlayerBtn.disabled = isClosed;
-    addPlayerBtn.classList.toggle('disabled', isClosed);
-  }
-}
-
-function updateCurrencySymbols() {
-  const symbol = getCurrencySymbol();
-  document.querySelectorAll('.currency-symbol').forEach((span) => {
-    span.textContent = symbol;
-  });
-  updateEventDetails();
 }
 
 function updateSummary() {
@@ -205,11 +238,6 @@ function updatePlayerLink() {
   playerLinkSpan.innerHTML = `<a href="${url.toString()}" target="_blank" rel="noopener">${url.toString()}</a>`;
 }
 
-function attachInputListeners(element, handler) {
-  element.addEventListener('input', handler);
-  element.addEventListener('change', handler);
-}
-
 function handlePlayerInputChange(row) {
   const buyinsInput = row.querySelector('.player-buyins');
   const finalInput = row.querySelector('.player-final');
@@ -225,11 +253,11 @@ function handlePlayerInputChange(row) {
   netCell.classList.remove('positive', 'negative');
   outcomeCell.classList.remove('positive', 'negative');
 
-  if (net > 0) {
+  if (net > 0.0001) {
     netCell.classList.add('positive');
     outcomeCell.textContent = 'Win';
     outcomeCell.classList.add('positive');
-  } else if (net < 0) {
+  } else if (net < -0.0001) {
     netCell.classList.add('negative');
     outcomeCell.textContent = 'Loss';
     outcomeCell.classList.add('negative');
@@ -239,8 +267,10 @@ function handlePlayerInputChange(row) {
     outcomeCell.textContent = '–';
   }
 
-  persistState();
   updateSummary();
+  if (!isRestoring) {
+    scheduleSave();
+  }
 }
 
 function createPlayerRow(player = {}) {
@@ -271,8 +301,8 @@ function createPlayerRow(player = {}) {
   removeBtn.addEventListener('click', () => {
     if (isPlayerView) return;
     row.remove();
-    persistState();
     updateSummary();
+    scheduleSave(true);
   });
 
   if (isPlayerView) {
@@ -284,39 +314,46 @@ function createPlayerRow(player = {}) {
   return row;
 }
 
+function addPlayerRow(player = {}) {
+  const row = createPlayerRow(player);
+  playersBody.appendChild(row);
+  return row;
+}
+
 function refreshAllRows() {
   playersBody.querySelectorAll('tr').forEach((row) => {
     handlePlayerInputChange(row);
   });
 }
 
-function resetAll() {
-  const confirmation = confirm('Reset host info and remove all players?');
-  if (!confirmation) {
-    return;
+function updateSessionStatusUI() {
+  const isClosed = sessionStatusSelect.value === 'closed';
+  if (sessionStatusIndicator) {
+    sessionStatusIndicator.textContent = isClosed ? 'Session closed' : 'Session open';
+    sessionStatusIndicator.classList.toggle('closed', isClosed);
   }
 
-  hostNameInput.value = '';
-  locationInput.value = '';
-  datetimeInput.value = '';
-  expenseInput.value = '';
-  reportedFinalInput.value = '';
-  currencySelect.value = 'USD';
-  sessionStatusSelect.value = 'open';
+  playersBody.querySelectorAll('input').forEach((input) => {
+    input.disabled = isClosed;
+  });
+  playersBody.querySelectorAll('.remove-player').forEach((button) => {
+    button.disabled = isClosed;
+    button.classList.toggle('disabled', isClosed);
+  });
 
-  playersBody.innerHTML = '';
-  addPlayerRow();
-  persistState();
-  updateCurrencySymbols();
-  updateSummary();
-  updateEventDetails();
-  updateSessionStatusUI();
+  if (addPlayerBtn) {
+    addPlayerBtn.disabled = isClosed;
+    addPlayerBtn.classList.toggle('disabled', isClosed);
+  }
 }
 
-function addPlayerRow(player = {}) {
-  const row = createPlayerRow(player);
-  playersBody.appendChild(row);
-  return row;
+function updateCurrencySymbols() {
+  const symbol = getCurrencySymbol();
+  document.querySelectorAll('.currency-symbol').forEach((span) => {
+    span.textContent = symbol;
+  });
+  updateEventDetails();
+  refreshAllRows();
 }
 
 function setupSettingsPanel() {
@@ -363,54 +400,643 @@ function updateViewForRole() {
       resetBtn.disabled = true;
       resetBtn.classList.add('disabled');
     }
+    if (startSessionBtn) {
+      startSessionBtn.disabled = true;
+      startSessionBtn.classList.add('disabled');
+    }
   }
 }
 
-function init() {
-  restoreState();
+function resetCurrentSession() {
+  if (!currentSession || isPlayerView) return;
+  const confirmation = confirm('Clear host info and remove all players from this session?');
+  if (!confirmation) {
+    return;
+  }
 
-  if (playersBody.children.length === 0) {
+  isRestoring = true;
+  hostNameInput.value = '';
+  locationInput.value = '';
+  datetimeInput.value = '';
+  expenseInput.value = '';
+  reportedFinalInput.value = '';
+  currencySelect.value = 'USD';
+  sessionStatusSelect.value = 'open';
+  playersBody.innerHTML = '';
+  addPlayerRow();
+  isRestoring = false;
+
+  updateCurrencySymbols();
+  updateEventDetails();
+  updateSummary();
+  updateSessionStatusUI();
+  scheduleSave(true);
+}
+
+async function createSessionOnServer() {
+  const response = await fetch(`${API_BASE}/sessions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create session: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+async function startNewSession() {
+  if (!startSessionBtn || isPlayerView) return;
+  if (currentSession && currentSession.settings?.sessionStatus !== 'closed') {
+    alert('Close the current session before starting a new one.');
+    return;
+  }
+
+  try {
+    const session = await createSessionOnServer();
+    sessions.push(session);
+    currentSession = session;
+    populateSession(session);
+    refreshScoreboardFilters();
+    updateScoreboard();
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function getSessionDate(session) {
+  const value = session?.settings?.datetime || session?.createdAt;
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return null;
+  return date;
+}
+
+function formatSessionLabel(session) {
+  const date = getSessionDate(session);
+  const host = session?.settings?.hostName?.trim();
+  const dateLabel = date
+    ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+    : 'No date';
+  return host ? `${dateLabel} · ${host}` : dateLabel;
+}
+
+function getSessionYear(session) {
+  const date = getSessionDate(session);
+  if (!date) return 'Unknown';
+  return String(date.getFullYear());
+}
+
+function getSessionsSortedByDate() {
+  return [...sessions].sort((a, b) => {
+    const dateA = getSessionDate(a)?.getTime() ?? 0;
+    const dateB = getSessionDate(b)?.getTime() ?? 0;
+    return dateB - dateA;
+  });
+}
+
+function getSortedYears() {
+  const years = new Set();
+  sessions.forEach((session) => {
+    years.add(getSessionYear(session));
+  });
+  return Array.from(years).sort((a, b) => {
+    if (a === 'Unknown') return 1;
+    if (b === 'Unknown') return -1;
+    return Number(b) - Number(a);
+  });
+}
+
+function refreshScoreboardFilters() {
+  if (!scoreboardScopeSelect) return;
+
+  const previousSession = scoreboardSessionSelect?.value;
+  const previousYear = scoreboardYearSelect?.value;
+
+  if (scoreboardSessionSelect) {
+    scoreboardSessionSelect.innerHTML = '';
+    const sortedSessions = getSessionsSortedByDate();
+
+    sortedSessions.forEach((session) => {
+      const option = document.createElement('option');
+      option.value = session.id;
+      option.textContent = formatSessionLabel(session);
+      scoreboardSessionSelect.appendChild(option);
+    });
+
+    if (previousSession && Array.from(scoreboardSessionSelect.options).some((opt) => opt.value === previousSession)) {
+      scoreboardSessionSelect.value = previousSession;
+    } else if (scoreboardSessionSelect.options.length > 0) {
+      scoreboardSessionSelect.value = scoreboardSessionSelect.options[0].value;
+    }
+    scoreboardSessionSelect.disabled = scoreboardSessionSelect.options.length === 0;
+  }
+
+  if (scoreboardYearSelect) {
+    scoreboardYearSelect.innerHTML = '';
+    const sortedYears = getSortedYears();
+    sortedYears.forEach((year) => {
+      const option = document.createElement('option');
+      option.value = year;
+      option.textContent = year;
+      scoreboardYearSelect.appendChild(option);
+    });
+
+    if (previousYear && Array.from(scoreboardYearSelect.options).some((opt) => opt.value === previousYear)) {
+      scoreboardYearSelect.value = previousYear;
+    } else if (scoreboardYearSelect.options.length > 0) {
+      scoreboardYearSelect.value = scoreboardYearSelect.options[0].value;
+    }
+    scoreboardYearSelect.disabled = scoreboardYearSelect.options.length === 0;
+  }
+
+  handleScoreboardScopeChange();
+}
+
+function handleScoreboardScopeChange() {
+  if (!scoreboardScopeSelect) return;
+  const scope = scoreboardScopeSelect.value;
+  if (scoreboardSessionWrapper) {
+    scoreboardSessionWrapper.hidden = scope !== 'session';
+  }
+  if (scoreboardYearWrapper) {
+    scoreboardYearWrapper.hidden = scope !== 'year';
+  }
+  updateScoreboard();
+}
+
+function sortPlayerStatsByNet(stats) {
+  return [...stats].sort((a, b) => {
+    if (b.totalNet !== a.totalNet) {
+      return b.totalNet - a.totalNet;
+    }
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function determineCurrencyForSessions(selectedSessions) {
+  const currencies = new Set();
+  selectedSessions.forEach((session) => {
+    const code = sanitizeCurrency(session?.settings?.currency);
+    currencies.add(code);
+  });
+  if (currencies.size === 1) {
+    return currencies.values().next().value;
+  }
+  return null;
+}
+
+function computePlayerStats(selectedSessions) {
+  const stats = new Map();
+
+  selectedSessions.forEach((session) => {
+    const sessionId = session.id;
+    (session.players ?? []).forEach((player) => {
+      const name = player.name?.trim() || 'Unnamed player';
+      const buyins = Number(player.buyins) || 0;
+      const final = Number(player.final) || 0;
+      const net = final - buyins;
+      const entry = stats.get(name) || {
+        name,
+        totalBuyins: 0,
+        totalFinal: 0,
+        totalNet: 0,
+        wins: 0,
+        losses: 0,
+        sessions: new Set(),
+      };
+
+      entry.totalBuyins += buyins;
+      entry.totalFinal += final;
+      entry.totalNet += net;
+      entry.sessions.add(sessionId);
+      if (net > 0.0001) {
+        entry.wins += 1;
+      } else if (net < -0.0001) {
+        entry.losses += 1;
+      }
+      stats.set(name, entry);
+    });
+  });
+
+  return Array.from(stats.values()).map((entry) => ({
+    ...entry,
+    sessionsPlayed: entry.sessions.size,
+  }));
+}
+
+function formatNetValue(value, currencyForScope) {
+  if (!Number.isFinite(value)) return '—';
+  if (currencyForScope) {
+    return formatCurrency(value, currencyForScope);
+  }
+  return `${value.toFixed(2)} (mixed)`;
+}
+
+function renderScoreboardMovesMessage(message) {
+  if (!scoreboardMoves) return;
+  scoreboardMoves.innerHTML = '';
+  const placeholder = document.createElement('p');
+  placeholder.className = 'movement-empty';
+  placeholder.textContent = message;
+  scoreboardMoves.appendChild(placeholder);
+}
+
+function resetScoreboardSummary() {
+  if (scoreboardWinnerName) {
+    scoreboardWinnerName.textContent = '—';
+  }
+  if (scoreboardWinnerValue) {
+    scoreboardWinnerValue.textContent = '—';
+    scoreboardWinnerValue.classList.remove('positive', 'negative');
+  }
+  if (scoreboardLoserName) {
+    scoreboardLoserName.textContent = '—';
+  }
+  if (scoreboardLoserValue) {
+    scoreboardLoserValue.textContent = '—';
+    scoreboardLoserValue.classList.remove('positive', 'negative');
+  }
+  renderScoreboardMovesMessage('—');
+}
+
+function buildRankingsForSessions(selectedSessions) {
+  const stats = computePlayerStats(selectedSessions);
+  if (stats.length === 0) {
+    return null;
+  }
+  const ordered = sortPlayerStatsByNet(stats);
+  const rankings = new Map();
+  ordered.forEach((entry, index) => {
+    rankings.set(entry.name, index + 1);
+  });
+  return { ordered, rankings };
+}
+
+function summarizeRankChanges(currentStats, previousData, previousLabel) {
+  if (!scoreboardMoves) return;
+
+  scoreboardMoves.innerHTML = '';
+
+  if (!previousData) {
+    renderScoreboardMovesMessage('No prior scope to compare.');
+    return;
+  }
+
+  const previousRankings = previousData.rankings;
+  if (!previousRankings || previousRankings.size === 0) {
+    renderScoreboardMovesMessage(`No comparable data for ${previousLabel}.`);
+    return;
+  }
+
+  const movementBadges = [];
+  const newcomers = [];
+  const currentNames = new Set();
+
+  currentStats.forEach((entry, index) => {
+    currentNames.add(entry.name);
+    const previousRank = previousRankings.get(entry.name);
+    if (typeof previousRank === 'number') {
+      const delta = previousRank - (index + 1);
+      if (delta !== 0) {
+        movementBadges.push({
+          name: entry.name,
+          direction: delta > 0 ? 'up' : 'down',
+          steps: Math.abs(delta),
+        });
+      }
+    } else {
+      newcomers.push(entry.name);
+    }
+  });
+
+  const departures = [];
+  previousData.ordered.forEach((entry) => {
+    if (!currentNames.has(entry.name)) {
+      departures.push(entry.name);
+    }
+  });
+
+  const summary = document.createElement('p');
+  summary.className = 'movement-summary';
+  summary.textContent = `Compared to ${previousLabel}:`;
+  scoreboardMoves.appendChild(summary);
+
+  if (movementBadges.length === 0 && newcomers.length === 0 && departures.length === 0) {
+    const noMovement = document.createElement('p');
+    noMovement.className = 'movement-empty';
+    noMovement.textContent = 'No movement on the leaderboard.';
+    scoreboardMoves.appendChild(noMovement);
+    return;
+  }
+
+  if (movementBadges.length > 0) {
+    const movementRow = document.createElement('div');
+    movementRow.className = 'movement-row';
+    movementBadges.forEach((item) => {
+      const badge = document.createElement('span');
+      badge.className = `movement-badge ${item.direction === 'up' ? 'movement-up' : 'movement-down'}`;
+      const arrow = item.direction === 'up' ? '↑' : '↓';
+      badge.textContent = `${item.name} ${arrow}${item.steps}`;
+      movementRow.appendChild(badge);
+    });
+    scoreboardMoves.appendChild(movementRow);
+  }
+
+  if (newcomers.length > 0) {
+    const newcomersRow = document.createElement('div');
+    newcomersRow.className = 'movement-row';
+    newcomers.forEach((name) => {
+      const badge = document.createElement('span');
+      badge.className = 'movement-badge movement-neutral';
+      badge.textContent = `New: ${name}`;
+      newcomersRow.appendChild(badge);
+    });
+    scoreboardMoves.appendChild(newcomersRow);
+  }
+
+  if (departures.length > 0) {
+    const departuresRow = document.createElement('div');
+    departuresRow.className = 'movement-row';
+    departures.forEach((name) => {
+      const badge = document.createElement('span');
+      badge.className = 'movement-badge movement-out';
+      badge.textContent = `Out: ${name}`;
+      departuresRow.appendChild(badge);
+    });
+    scoreboardMoves.appendChild(departuresRow);
+  }
+}
+
+function updateScoreboard() {
+  if (!scoreboardTableBody || !scoreboardScopeSelect) return;
+
+  resetScoreboardSummary();
+
+  const scope = scoreboardScopeSelect.value;
+  let selectedSessions = [];
+  let contextLabel = '';
+  let comparisonSessions = [];
+  let comparisonLabel = '';
+
+  if (scope === 'session') {
+    const sessionId = scoreboardSessionSelect?.value;
+    if (sessionId) {
+      const session = sessions.find((item) => item.id === sessionId);
+      if (session) {
+        selectedSessions = [session];
+        contextLabel = formatSessionLabel(session);
+
+        const sortedSessions = getSessionsSortedByDate();
+        const currentIndex = sortedSessions.findIndex((item) => item.id === sessionId);
+        if (currentIndex !== -1) {
+          const previousSession = sortedSessions[currentIndex + 1];
+          if (previousSession) {
+            comparisonSessions = [previousSession];
+            comparisonLabel = formatSessionLabel(previousSession);
+          }
+        }
+      }
+    }
+  } else if (scope === 'year') {
+    const year = scoreboardYearSelect?.value;
+    if (year) {
+      selectedSessions = sessions.filter((session) => getSessionYear(session) === year);
+      contextLabel = year === 'Unknown' ? 'Sessions without a set date' : `Year ${year}`;
+
+      const sortedYears = getSortedYears();
+      const currentIndex = sortedYears.indexOf(year);
+      if (currentIndex !== -1) {
+        const previousYear = sortedYears[currentIndex + 1];
+        if (previousYear) {
+          comparisonSessions = sessions.filter((session) => getSessionYear(session) === previousYear);
+          comparisonLabel =
+            previousYear === 'Unknown' ? 'Sessions without a set date' : `Year ${previousYear}`;
+        }
+      }
+    }
+  } else {
+    selectedSessions = [...sessions];
+    contextLabel = 'All sessions';
+  }
+
+  if (selectedSessions.length === 0) {
+    scoreboardTableBody.innerHTML = '<tr><td colspan="5" class="empty">No results yet</td></tr>';
+    scoreboardProfitName.textContent = '—';
+    scoreboardProfitValue.textContent = '—';
+    scoreboardWinsName.textContent = '—';
+    scoreboardWinsValue.textContent = '—';
+    if (scoreboardWinnerName) scoreboardWinnerName.textContent = '—';
+    if (scoreboardWinnerValue) scoreboardWinnerValue.textContent = '—';
+    if (scoreboardLoserName) scoreboardLoserName.textContent = '—';
+    if (scoreboardLoserValue) scoreboardLoserValue.textContent = '—';
+    renderScoreboardMovesMessage('No sessions recorded yet.');
+    scoreboardNote.textContent =
+      sessions.length === 0 ? 'No sessions recorded yet.' : 'No sessions available for the selected view.';
+    return;
+  }
+
+  const playerStats = sortPlayerStatsByNet(computePlayerStats(selectedSessions));
+  if (playerStats.length === 0) {
+    scoreboardTableBody.innerHTML = '<tr><td colspan="5" class="empty">No player results yet</td></tr>';
+    scoreboardProfitName.textContent = '—';
+    scoreboardProfitValue.textContent = '—';
+    scoreboardWinsName.textContent = '—';
+    scoreboardWinsValue.textContent = '—';
+    if (scoreboardWinnerName) scoreboardWinnerName.textContent = '—';
+    if (scoreboardWinnerValue) scoreboardWinnerValue.textContent = '—';
+    if (scoreboardLoserName) scoreboardLoserName.textContent = '—';
+    if (scoreboardLoserValue) scoreboardLoserValue.textContent = '—';
+    renderScoreboardMovesMessage(`${contextLabel || 'Selected view'} has no player data yet.`);
+    scoreboardNote.textContent = `${contextLabel || 'Selected view'} has no player data yet.`;
+    return;
+  }
+
+  const currencyForScope = determineCurrencyForSessions(selectedSessions);
+
+  const profitLeader = playerStats[0];
+  scoreboardProfitName.textContent = profitLeader.name;
+  scoreboardProfitValue.textContent = formatNetValue(profitLeader.totalNet, currencyForScope);
+
+  const winLeader = playerStats.reduce((best, candidate) => {
+    if (!best) return candidate;
+    if (candidate.wins > best.wins) return candidate;
+    if (candidate.wins === best.wins) {
+      if (candidate.totalNet > best.totalNet) return candidate;
+      if (candidate.totalNet === best.totalNet) {
+        return candidate.name.localeCompare(best.name) < 0 ? candidate : best;
+      }
+    }
+    return best;
+  }, null);
+
+  if (winLeader) {
+    scoreboardWinsName.textContent = winLeader.name;
+    scoreboardWinsValue.textContent = `${winLeader.wins} win${winLeader.wins === 1 ? '' : 's'}`;
+  } else {
+    scoreboardWinsName.textContent = '—';
+    scoreboardWinsValue.textContent = '—';
+  }
+
+  if (scoreboardWinnerName) {
+    scoreboardWinnerName.textContent = profitLeader.name;
+  }
+  if (scoreboardWinnerValue) {
+    scoreboardWinnerValue.textContent = formatNetValue(profitLeader.totalNet, currencyForScope);
+    scoreboardWinnerValue.classList.remove('positive', 'negative');
+    if (profitLeader.totalNet > 0.0001) {
+      scoreboardWinnerValue.classList.add('positive');
+    } else if (profitLeader.totalNet < -0.0001) {
+      scoreboardWinnerValue.classList.add('negative');
+    }
+  }
+
+  const lowestPerformer = playerStats[playerStats.length - 1];
+  if (scoreboardLoserName) {
+    scoreboardLoserName.textContent = lowestPerformer.name;
+  }
+  if (scoreboardLoserValue) {
+    scoreboardLoserValue.textContent = formatNetValue(lowestPerformer.totalNet, currencyForScope);
+    scoreboardLoserValue.classList.remove('positive', 'negative');
+    if (lowestPerformer.totalNet > 0.0001) {
+      scoreboardLoserValue.classList.add('positive');
+    } else if (lowestPerformer.totalNet < -0.0001) {
+      scoreboardLoserValue.classList.add('negative');
+    }
+  }
+
+  const previousData = comparisonSessions.length > 0 ? buildRankingsForSessions(comparisonSessions) : null;
+  summarizeRankChanges(playerStats, previousData, comparisonLabel || 'previous scope');
+
+  scoreboardTableBody.innerHTML = '';
+  playerStats.forEach((entry) => {
+    const row = document.createElement('tr');
+    const values = [
+      entry.name,
+      String(entry.sessionsPlayed),
+      String(entry.wins),
+      String(entry.losses),
+      formatNetValue(entry.totalNet, currencyForScope),
+    ];
+
+    values.forEach((value) => {
+      const cell = document.createElement('td');
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+
+    scoreboardTableBody.appendChild(row);
+  });
+
+  const totalSessions = selectedSessions.length;
+  const sessionWord = totalSessions === 1 ? 'session' : 'sessions';
+  const currencyNote = currencyForScope
+    ? `Values shown in ${currencyForScope}.`
+    : 'Results span multiple currencies.';
+  scoreboardNote.textContent = `${contextLabel || 'Selected view'} · ${totalSessions} ${sessionWord}. ${currencyNote}`;
+}
+
+function populateSession(session) {
+  if (!session) return;
+  isRestoring = true;
+
+  const settings = session.settings ?? {};
+  hostNameInput.value = settings.hostName ?? '';
+  locationInput.value = settings.location ?? '';
+  datetimeInput.value = settings.datetime ?? '';
+  expenseInput.value = settings.expenses ?? '';
+  reportedFinalInput.value = settings.reportedFinal ?? '';
+  currencySelect.value = sanitizeCurrency(settings.currency);
+  sessionStatusSelect.value = settings.sessionStatus === 'closed' ? 'closed' : 'open';
+
+  playersBody.innerHTML = '';
+  if (Array.isArray(session.players) && session.players.length > 0) {
+    session.players.forEach((player) => addPlayerRow(player));
+  } else {
     addPlayerRow();
   }
 
-  updateViewForRole();
-  setupSettingsPanel();
   updateCurrencySymbols();
   updateEventDetails();
   updateSummary();
   updateSessionStatusUI();
   updatePlayerLink();
 
+  isRestoring = false;
+}
+
+async function loadSessions() {
+  try {
+    const response = await fetch(`${API_BASE}/sessions`);
+    if (!response.ok) {
+      throw new Error(`Failed to load sessions: ${response.status}`);
+    }
+    const data = await response.json();
+    sessions = Array.isArray(data.sessions) ? data.sessions : [];
+
+    currentSession = sessions.find((session) => session.settings?.sessionStatus === 'open');
+    if (!currentSession) {
+      sessions.sort((a, b) => {
+        const dateA = getSessionDate(a)?.getTime() ?? 0;
+        const dateB = getSessionDate(b)?.getTime() ?? 0;
+        return dateB - dateA;
+      });
+      currentSession = sessions[0] ?? null;
+    }
+
+    if (!currentSession) {
+      currentSession = await createSessionOnServer();
+      sessions.push(currentSession);
+    }
+
+    populateSession(currentSession);
+    refreshScoreboardFilters();
+    updateScoreboard();
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function attachInputListeners(element, handler) {
+  if (!element) return;
+  element.addEventListener('input', handler);
+  element.addEventListener('change', handler);
+}
+
+function initEventListeners() {
   attachInputListeners(hostNameInput, () => {
     updateEventDetails();
-    persistState();
+    scheduleSave();
   });
   attachInputListeners(locationInput, () => {
     updateEventDetails();
-    persistState();
+    scheduleSave();
   });
   attachInputListeners(datetimeInput, () => {
     updateEventDetails();
-    persistState();
+    scheduleSave();
+    refreshScoreboardFilters();
   });
   attachInputListeners(expenseInput, () => {
     updateEventDetails();
-    persistState();
     updateSummary();
+    scheduleSave();
   });
   attachInputListeners(reportedFinalInput, () => {
     updateEventDetails();
-    persistState();
+    scheduleSave();
   });
   attachInputListeners(currencySelect, () => {
     updateCurrencySymbols();
-    refreshAllRows();
-    persistState();
-    updateSummary();
+    scheduleSave();
   });
   attachInputListeners(sessionStatusSelect, () => {
     updateSessionStatusUI();
-    persistState();
+    scheduleSave(true);
   });
 
   addPlayerBtn?.addEventListener('click', () => {
@@ -420,11 +1046,22 @@ function init() {
       return;
     }
     row.querySelector('.player-name')?.focus();
-    persistState();
-    updateSummary();
+    scheduleSave();
   });
 
-  resetBtn?.addEventListener('click', resetAll);
+  resetBtn?.addEventListener('click', resetCurrentSession);
+  startSessionBtn?.addEventListener('click', startNewSession);
+
+  scoreboardScopeSelect?.addEventListener('change', handleScoreboardScopeChange);
+  scoreboardSessionSelect?.addEventListener('change', updateScoreboard);
+  scoreboardYearSelect?.addEventListener('change', updateScoreboard);
+}
+
+async function init() {
+  updateViewForRole();
+  setupSettingsPanel();
+  await loadSessions();
+  initEventListeners();
 }
 
 window.addEventListener('DOMContentLoaded', init);
