@@ -1,0 +1,670 @@
+/*
+  Theme palette and shared measurements tuned for the Texas Hold'em aesthetic.
+*/
+:root {
+  --bg: #02110d;
+  --bg-mid: #0a3c2c;
+  --felt: #0f6041;
+  --card: rgba(5, 35, 25, 0.92);
+  --text: #f5f2e6;
+  --muted: #c6d8cb;
+  --accent: #d4af37;
+  --accent-dark: #b88910;
+  --danger: #ff6b6b;
+  --success: #6ee7b7;
+  --border: rgba(212, 175, 55, 0.24);
+  --radius: 12px;
+  font-size: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/*
+  Full-page felt backdrop with subtle golden highlights.
+*/
+body {
+  margin: 0;
+  font-family: "Montserrat", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: radial-gradient(circle at 20% 20%, var(--felt), var(--bg));
+  color: var(--text);
+  min-height: 100vh;
+  padding: 1.5rem;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Layer soft noise and highlights behind the felt gradient. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 5% 15%, rgba(255, 255, 255, 0.05) 0, rgba(255, 255, 255, 0) 55%),
+    radial-gradient(circle at 90% 80%, rgba(255, 215, 0, 0.06) 0, rgba(255, 215, 0, 0) 60%),
+    repeating-linear-gradient(
+      45deg,
+      rgba(8, 50, 36, 0.25) 0,
+      rgba(8, 50, 36, 0.25) 6px,
+      rgba(2, 17, 13, 0.35) 6px,
+      rgba(2, 17, 13, 0.35) 14px
+    );
+  pointer-events: none;
+  z-index: -2;
+}
+
+/* Add a secondary glow to hint at overhead lighting. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 75% 30%, rgba(255, 215, 0, 0.08), transparent 55%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Constrain the main dashboard width and stack sections vertically. */
+main.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Header banner containing the title and live session indicator. */
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.5rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2rem, 2.7vw, 2.75rem);
+}
+
+.subtitle {
+  color: var(--muted);
+  margin-top: 0.5rem;
+}
+
+/* Generic card container used throughout the dashboard. */
+.card {
+  background: linear-gradient(160deg, rgba(7, 44, 31, 0.92), rgba(3, 24, 18, 0.95));
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 45px rgba(2, 15, 11, 0.6);
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top right, rgba(212, 175, 55, 0.16), transparent 55%);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.event-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem 1.25rem;
+  margin: 0;
+}
+
+/* Display each definition pair vertically for clarity. */
+.event-details div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.event-details dt {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.event-details dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Pill badge reflecting whether the table is open or closed. */
+.session-status {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(110, 231, 183, 0.16);
+  color: var(--success);
+  font-weight: 600;
+  border: 1px solid rgba(110, 231, 183, 0.35);
+}
+
+.session-status.closed {
+  background: rgba(255, 107, 107, 0.18);
+  color: var(--danger);
+  border-color: rgba(255, 107, 107, 0.45);
+}
+
+/* Player link banner shown when someone joins from the shared URL. */
+.player-banner {
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  color: #f8e7a2;
+}
+
+/* Shared header layout for card titles and actions. */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.section-header h2 {
+  margin: 0;
+}
+
+/* Utility grid for distributing input controls. */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+/* Normalize labels to stack captions above the inputs. */
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Stylize inputs/selects with casino-inspired chrome. */
+input[type="text"],
+input[type="number"],
+select {
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 0.55rem 0.75rem;
+  background: rgba(17, 24, 39, 0.7);
+  color: var(--text);
+  font-size: 1rem;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(17, 24, 39, 0.9);
+}
+
+/* Align currency symbol adorners with the numeric input. */
+.currency-input {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.currency-input .currency-symbol {
+  color: var(--muted);
+}
+
+/* Custom dropdown arrow using pure CSS gradients. */
+select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 12px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 2.5rem;
+}
+
+/* Base button styling shared by primary/ghost variants. */
+button {
+  font: inherit;
+  border: none;
+  border-radius: 999px;
+  padding: 0.55rem 1.2rem;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+/* Golden gradient button for primary calls to action. */
+button.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #120b04;
+  font-weight: 600;
+  box-shadow: 0 12px 28px rgba(212, 175, 55, 0.35);
+}
+
+button.primary:hover,
+button.primary:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px rgba(212, 175, 55, 0.45);
+}
+
+/* Low-emphasis button with translucent background. */
+button.ghost {
+  background: rgba(198, 216, 203, 0.08);
+  color: var(--text);
+  border: 1px solid rgba(198, 216, 203, 0.2);
+}
+
+button.ghost:hover,
+button.ghost:focus-visible {
+  background: rgba(198, 216, 203, 0.18);
+}
+
+/* Allow tables to scroll horizontally on smaller screens. */
+.table-wrapper {
+  overflow-x: auto;
+}
+
+/* Hamburger toggle fixed to the corner for opening settings. */
+.settings-toggle {
+  position: fixed;
+  top: 1.5rem;
+  left: 1.5rem;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: rgba(3, 30, 21, 0.85);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 0.75rem;
+  box-shadow: 0 18px 30px rgba(2, 15, 11, 0.55);
+  z-index: 20;
+}
+
+.settings-toggle span {
+  display: block;
+  height: 2px;
+  background: var(--text);
+  border-radius: 999px;
+}
+
+.settings-toggle.hidden {
+  display: none;
+}
+
+/* Sliding drawer that houses all admin controls. */
+.settings-panel {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(320px, 85vw);
+  background: rgba(5, 36, 25, 0.97);
+  border-right: 1px solid rgba(212, 175, 55, 0.25);
+  box-shadow: 20px 0 48px rgba(2, 15, 11, 0.7);
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  padding: 1.5rem;
+  z-index: 30;
+  overflow-y: auto;
+}
+
+.settings-panel.open {
+  transform: translateX(0);
+}
+
+.settings-panel.player-hidden {
+  display: none;
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.settings-header h2 {
+  margin: 0;
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Backdrop overlay that dims the layout while settings are open. */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 17, 13, 0.65);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  z-index: 25;
+}
+
+.settings-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Table layout shared by the player list and scoreboard grid. */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 600px;
+}
+
+/* Keep header cells distinct against the felt background. */
+thead {
+  background: rgba(5, 35, 25, 0.85);
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid rgba(198, 216, 203, 0.18);
+}
+
+th {
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.8rem;
+}
+
+/* Highlight rows on hover to mimic a felt table lighting shift. */
+tbody tr:hover {
+  background: rgba(212, 175, 55, 0.08);
+}
+
+.net-result.positive {
+  color: var(--success);
+}
+
+.net-result.negative,
+.outcome.negative {
+  color: var(--danger);
+}
+
+.outcome.positive {
+  color: var(--success);
+}
+
+/* Shout when the table totals do not reconcile. */
+#table-delta.alert {
+  color: #ff4d4f;
+  background: rgba(255, 77, 79, 0.2);
+  padding: 0.3rem 0.6rem;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+/* Responsive grid for the high-level session metrics. */
+.summary-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+/* Shared card look for the metric tiles. */
+.summary-card {
+  background: rgba(4, 32, 22, 0.88);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  border: 1px solid rgba(212, 175, 55, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.summary-card h3 {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  color: rgba(248, 231, 162, 0.8);
+  margin-bottom: 0.75rem;
+}
+
+.summary-card .metric {
+  font-size: clamp(1.4rem, 2vw, 1.75rem);
+  font-weight: 700;
+}
+
+/* Align scoreboard heading with its filters. */
+.scoreboard-header {
+  align-items: flex-start;
+}
+
+.scoreboard-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.scoreboard-filters label {
+  min-width: 140px;
+}
+
+/* Mini cards calling out top performers. */
+.scoreboard-leaders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+/* Larger bricks summarizing winners, losers, and movement. */
+.scoreboard-summary {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+/* Stylized scoreboard brick evoking poker chip stacks. */
+.summary-brick {
+  background: rgba(6, 44, 31, 0.95);
+  border-radius: 18px;
+  padding: 1.5rem;
+  border: 1px solid rgba(212, 175, 55, 0.22);
+  box-shadow: 0 12px 28px rgba(2, 15, 11, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Brick headings mimic table placards. */
+.summary-brick h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(248, 231, 162, 0.85);
+}
+
+/* Oversized winner/loser names and amounts. */
+.summary-brick .metric {
+  margin: 0;
+  font-size: clamp(1.6rem, 2.6vw, 2rem);
+  font-weight: 700;
+}
+
+/* Secondary text under the brick headline. */
+.summary-brick .detail {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.summary-brick .detail.positive {
+  color: var(--success);
+}
+
+.summary-brick .detail.negative {
+  color: var(--danger);
+}
+
+/* Stack scoreboard movement rows vertically. */
+.movement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Caption describing which scope is used for comparison. */
+.movement-summary {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(248, 231, 162, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Arrange movement badges in a responsive row. */
+.movement-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Base styling for up/down/new/out badges. */
+.movement-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+  text-transform: none;
+}
+
+/* Highlight players climbing the leaderboard. */
+.movement-up {
+  background: rgba(110, 231, 183, 0.15);
+  color: var(--success);
+  border-color: rgba(110, 231, 183, 0.35);
+}
+
+/* Emphasize players who dropped positions. */
+.movement-down {
+  background: rgba(255, 107, 107, 0.18);
+  color: var(--danger);
+  border-color: rgba(255, 107, 107, 0.4);
+}
+
+/* Indicate new arrivals to the leaderboard. */
+.movement-neutral {
+  background: rgba(212, 175, 55, 0.16);
+  color: rgba(248, 231, 162, 0.95);
+  border-color: rgba(212, 175, 55, 0.3);
+}
+
+/* Call out players who left the rankings. */
+.movement-out {
+  background: rgba(128, 90, 213, 0.16);
+  color: #d4c8ff;
+  border-color: rgba(128, 90, 213, 0.35);
+}
+
+/* Placeholder when there are no movements to report. */
+.movement-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.scoreboard-leaders .summary-card {
+  height: 100%;
+}
+
+.scoreboard-leaders .metric {
+  font-size: 1.4rem;
+}
+
+#scoreboard-table .empty {
+  text-align: center;
+  color: var(--muted);
+}
+
+/* Supplementary context text below the scoreboard. */
+#scoreboard-note {
+  margin-top: 1rem;
+}
+
+.metric {
+  font-size: 1.7rem;
+  font-weight: 700;
+  margin: 0.2rem 0 0;
+}
+
+/* Helper text shared across the dashboard. */
+.hint {
+  margin: 0.2rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+button.disabled,
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+.actions {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.actions .hidden {
+  display: none;
+}
+
+/* Responsive adjustments for tablets and phones. */
+@media (max-width: 720px) {
+  body {
+    padding: 1rem;
+  }
+
+  table {
+    min-width: unset;
+  }
+
+  th,
+  td {
+    padding: 0.65rem;
+  }
+
+  .settings-toggle {
+    top: 1rem;
+    left: 1rem;
+  }
+
+  .scoreboard-filters {
+    width: 100%;
+  }
+
+  .scoreboard-filters label {
+    flex: 1 1 140px;
+  }
+}

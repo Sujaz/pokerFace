@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<!--
+  Texas Hold'em Tracker main shell.
+  This markup renders the dashboard host view alongside the player table and scoreboard.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Texas Hold'em Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Floating hamburger icon that toggles the admin settings drawer -->
+  <button id="settings-toggle" class="settings-toggle" aria-label="Open settings">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
+
+  <!-- Slide-out settings menu used by the host to manage the night -->
+  <aside id="settings-panel" class="settings-panel" aria-hidden="true">
+    <div class="settings-header">
+      <h2>Session Settings</h2>
+      <button id="close-settings" class="ghost" aria-label="Close settings">Close</button>
+    </div>
+    <div class="settings-body">
+      <!-- Host profile, venue details, currency, and lifecycle controls -->
+      <section aria-labelledby="host-settings-heading">
+        <h3 id="host-settings-heading">Host details</h3>
+        <label>
+          Host name
+          <input type="text" id="host-name" placeholder="e.g. Alex" />
+        </label>
+        <label>
+          Location
+          <input type="text" id="host-location" placeholder="e.g. Downtown Loft" />
+        </label>
+        <label>
+          Session date &amp; time
+          <input type="datetime-local" id="session-datetime" />
+        </label>
+        <label>
+          Currency
+          <select id="currency-select">
+            <option value="USD">USD ($)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="ILS">ILS (₪)</option>
+          </select>
+        </label>
+        <label>
+          Table expenses
+          <div class="currency-input">
+            <span class="currency-symbol">$</span>
+            <input type="number" id="table-expense" min="0" step="0.01" placeholder="0.00" />
+          </div>
+        </label>
+        <label>
+          Total final cash (reported)
+          <div class="currency-input">
+            <span class="currency-symbol">$</span>
+            <input type="number" id="reported-final" min="0" step="0.01" placeholder="0.00" />
+          </div>
+        </label>
+        <label>
+          Session status
+          <select id="session-status">
+            <option value="open">Open</option>
+            <option value="closed">Closed</option>
+          </select>
+        </label>
+      </section>
+      <!-- Quick administrative actions for managing sessions and sharing the link -->
+      <section aria-labelledby="admin-actions-heading">
+        <h3 id="admin-actions-heading">Admin actions</h3>
+        <button id="start-session-btn" class="primary">Start new session</button>
+        <button id="reset-btn" class="ghost">Clear current session</button>
+        <p class="hint">Share this link so players can register: <span id="player-link"></span></p>
+      </section>
+    </div>
+  </aside>
+
+  <div id="settings-overlay" class="settings-overlay" aria-hidden="true"></div>
+
+  <main class="app">
+    <!-- Hero banner communicates the Texas Hold'em focus and live status -->
+    <header>
+      <div>
+        <h1>Texas Hold'em Night Tracker</h1>
+        <p class="subtitle">Run the table with live chip counts, buy-ins, and final tallies for every Hold'em session.</p>
+      </div>
+      <div class="session-status" id="session-status-indicator">Session open</div>
+    </header>
+
+    <!-- Host-facing overview of critical event metadata -->
+    <section class="card" aria-labelledby="event-heading">
+      <div class="section-header">
+        <h2 id="event-heading">Event details</h2>
+      </div>
+      <dl class="event-details">
+        <div>
+          <dt>Host</dt>
+          <dd id="display-host">—</dd>
+        </div>
+        <div>
+          <dt>Location</dt>
+          <dd id="display-location">—</dd>
+        </div>
+        <div>
+          <dt>Date &amp; time</dt>
+          <dd id="display-datetime">—</dd>
+        </div>
+        <div>
+          <dt>Reported final cash</dt>
+          <dd id="display-reported-final">$0.00</dd>
+        </div>
+        <div>
+          <dt>Table expenses</dt>
+          <dd id="display-expenses">$0.00</dd>
+        </div>
+      </dl>
+    </section>
+
+    <div id="player-mode-banner" class="player-banner" hidden>
+      <p>This is the player view. You can add yourself or update your numbers while the session is open.</p>
+    </div>
+
+    <!-- Interactive roster of players with buy-ins and cash out totals -->
+    <section class="card" aria-labelledby="players-heading">
+      <div class="section-header">
+        <h2 id="players-heading">Players</h2>
+        <button id="add-player-btn" class="primary">Add Player</button>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Player</th>
+              <th scope="col">Buy-ins (<span class="currency-symbol">$</span>)</th>
+              <th scope="col">Final cash (<span class="currency-symbol">$</span>)</th>
+              <th scope="col">Net result</th>
+              <th scope="col">Outcome</th>
+              <th scope="col" class="actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="players-body">
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Aggregated totals help the host reconcile the table quickly -->
+    <section class="card" aria-labelledby="summary-heading">
+      <h2 id="summary-heading">Summary</h2>
+      <div class="summary-grid" id="summary-grid" role="list">
+        <article class="summary-card" role="listitem">
+          <h3>Total buy-ins</h3>
+          <p id="total-buyins" class="metric">$0.00</p>
+        </article>
+        <article class="summary-card" role="listitem">
+          <h3>Total final cash</h3>
+          <p id="total-final" class="metric">$0.00</p>
+        </article>
+        <article class="summary-card" role="listitem">
+          <h3>Table delta</h3>
+          <p id="table-delta" class="metric">$0.00</p>
+          <p class="hint">(Final cash minus buy-ins)</p>
+        </article>
+        <article class="summary-card" role="listitem">
+          <h3>Expenses</h3>
+          <p id="summary-expenses" class="metric">$0.00</p>
+        </article>
+        <article class="summary-card" role="listitem">
+          <h3>Amount left after expenses</h3>
+          <p id="amount-left" class="metric">$0.00</p>
+        </article>
+        <article class="summary-card" role="listitem">
+          <h3>Wins / Losses</h3>
+          <p id="wins-losses" class="metric">0 / 0</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Leaderboard capturing profitability, win rates, and momentum across scopes -->
+    <section class="card" aria-labelledby="scoreboard-heading">
+      <div class="section-header scoreboard-header">
+        <h2 id="scoreboard-heading">Scoreboard</h2>
+        <div class="scoreboard-filters">
+          <label>
+            Scope
+            <select id="scoreboard-scope">
+              <option value="session">Session</option>
+              <option value="year">Year</option>
+              <option value="all">All time</option>
+            </select>
+          </label>
+          <label id="scoreboard-session-wrapper">
+            Session
+            <select id="scoreboard-session"></select>
+          </label>
+          <label id="scoreboard-year-wrapper" hidden>
+            Year
+            <select id="scoreboard-year"></select>
+          </label>
+        </div>
+      </div>
+      <div class="scoreboard-leaders">
+        <article class="summary-card" role="listitem">
+          <h3>Top profit</h3>
+          <p id="scoreboard-profit-name" class="metric">—</p>
+          <p id="scoreboard-profit-value" class="hint">—</p>
+        </article>
+        <article class="summary-card" role="listitem">
+          <h3>Most wins</h3>
+          <p id="scoreboard-wins-name" class="metric">—</p>
+          <p id="scoreboard-wins-value" class="hint">—</p>
+        </article>
+      </div>
+      <div class="scoreboard-summary" role="list">
+        <article class="summary-brick" role="listitem">
+          <h3>Big Winner</h3>
+          <p id="scoreboard-winner-name" class="metric">—</p>
+          <p id="scoreboard-winner-value" class="detail">—</p>
+        </article>
+        <article class="summary-brick" role="listitem">
+          <h3>Tough Night</h3>
+          <p id="scoreboard-loser-name" class="metric">—</p>
+          <p id="scoreboard-loser-value" class="detail">—</p>
+        </article>
+        <article class="summary-brick" role="listitem">
+          <h3>Scoreboard Moves</h3>
+          <div id="scoreboard-moves" class="movement-list" role="list">
+            <p class="movement-empty">—</p>
+          </div>
+        </article>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Player</th>
+              <th scope="col">Sessions</th>
+              <th scope="col">Wins</th>
+              <th scope="col">Losses</th>
+              <th scope="col">Net</th>
+            </tr>
+          </thead>
+          <tbody id="scoreboard-table">
+            <tr>
+              <td colspan="5" class="empty">No results yet</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p id="scoreboard-note" class="hint"></p>
+    </section>
+  </main>
+
+  <!-- Template used to render additional player rows dynamically -->
+  <template id="player-row-template">
+    <tr>
+      <td data-label="Player">
+        <input type="text" class="player-name" placeholder="Name" />
+      </td>
+      <td data-label="Buy-ins">
+        <div class="currency-input">
+          <span class="currency-symbol">$</span>
+          <input type="number" class="player-buyins" min="0" step="0.01" placeholder="0.00" />
+        </div>
+      </td>
+      <td data-label="Final cash">
+        <div class="currency-input">
+          <span class="currency-symbol">$</span>
+          <input type="number" class="player-final" min="0" step="0.01" placeholder="0.00" />
+        </div>
+      </td>
+      <td data-label="Net result" class="net-result">
+        $0.00
+      </td>
+      <td data-label="Outcome" class="outcome">–</td>
+      <td class="actions">
+        <button class="ghost remove-player">Remove</button>
+      </td>
+    </tr>
+  </template>
+
+  <script src="main.js" type="module"></script>
+</body>
+</html>
