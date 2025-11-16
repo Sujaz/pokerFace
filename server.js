@@ -17,6 +17,10 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
 };
 
+/**
+ * Guarantees that the sessions directory and JSON file exist on disk.
+ * @returns {Promise<void>} Resolves when the storage path is ready.
+ */
 async function ensureDataFile() {
   try {
     await fsp.mkdir(DATA_DIR, { recursive: true });
@@ -26,6 +30,10 @@ async function ensureDataFile() {
   }
 }
 
+/**
+ * Reads and parses the sessions collection from storage.
+ * @returns {Promise<Array>} Stored sessions as JavaScript objects.
+ */
 async function readSessions() {
   await ensureDataFile();
   const raw = await fsp.readFile(SESSIONS_FILE, 'utf-8');
@@ -39,15 +47,31 @@ async function readSessions() {
   }
 }
 
+/**
+ * Serializes the provided sessions collection to disk.
+ * @param {Array} sessions - Session list to persist.
+ * @returns {Promise<void>} Resolves once the file is written.
+ */
 async function writeSessions(sessions) {
   await ensureDataFile();
   await fsp.writeFile(SESSIONS_FILE, JSON.stringify(sessions, null, 2));
 }
 
+/**
+ * Generates a unique identifier for new session records.
+ * @returns {string} Newly generated session ID.
+ */
 function generateId() {
   return `session-${Math.random().toString(36).slice(2)}-${Date.now()}`;
 }
 
+/**
+ * Sends a JSON response with the supplied status code and payload.
+ * @param {http.ServerResponse} res - Response object to write to.
+ * @param {number} statusCode - HTTP status code for the response.
+ * @param {Object} payload - Serializable data to send.
+ * @returns {void}
+ */
 function sendJson(res, statusCode, payload) {
   const body = JSON.stringify(payload);
   res.writeHead(statusCode, {
@@ -57,6 +81,11 @@ function sendJson(res, statusCode, payload) {
   res.end(body);
 }
 
+/**
+ * Consumes and parses a JSON request body.
+ * @param {http.IncomingMessage} req - Incoming HTTP request.
+ * @returns {Promise<Object>} Parsed JSON payload.
+ */
 async function parseRequestBody(req) {
   return new Promise((resolve, reject) => {
     let data = '';
@@ -83,6 +112,12 @@ async function parseRequestBody(req) {
   });
 }
 
+/**
+ * Streams a static asset from disk to the requester.
+ * @param {http.ServerResponse} res - Response object to stream to.
+ * @param {string} filePath - Absolute path to the file to serve.
+ * @returns {void}
+ */
 function serveStaticFile(res, filePath) {
   fs.stat(filePath, (statError, stats) => {
     if (statError || !stats.isFile()) {
@@ -101,10 +136,22 @@ function serveStaticFile(res, filePath) {
   });
 }
 
+/**
+ * Determines whether the request path targets the JSON API.
+ * @param {string} urlPath - Pathname portion of the request URL.
+ * @returns {boolean} True when the path is an API endpoint.
+ */
 function isApiRoute(urlPath) {
   return urlPath.startsWith('/api/');
 }
 
+/**
+ * Routes API requests for session CRUD operations.
+ * @param {http.IncomingMessage} req - Client request.
+ * @param {http.ServerResponse} res - Response to populate.
+ * @param {URL} url - Parsed request URL.
+ * @returns {Promise<void>} Resolves after the request is handled.
+ */
 async function handleApiRequest(req, res, url) {
   const { pathname } = url;
 
@@ -195,6 +242,12 @@ async function handleApiRequest(req, res, url) {
   res.end(JSON.stringify({ message: 'Method not allowed' }));
 }
 
+/**
+ * Primary HTTP request handler supporting API and static file serving.
+ * @param {http.IncomingMessage} req - Request from the client.
+ * @param {http.ServerResponse} res - Response object for the reply.
+ * @returns {Promise<void>} Resolves when the response is sent.
+ */
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);

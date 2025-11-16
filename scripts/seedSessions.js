@@ -4,6 +4,14 @@ const path = require('path');
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 
+/**
+ * Creates a player entry for the seed data file.
+ * @param {string} id - Stable identifier for the player.
+ * @param {string} name - Display name of the player.
+ * @param {number} buyins - Total buy-ins purchased.
+ * @param {number} final - Final chip/cash amount.
+ * @returns {{id:string,name:string,buyins:number,final:number}} Player object.
+ */
 function makePlayer(id, name, buyins, final) {
   return {
     id,
@@ -13,6 +21,22 @@ function makePlayer(id, name, buyins, final) {
   };
 }
 
+/**
+ * Builds a session object using simple shorthand parameters.
+ * @param {Object} config - Properties describing the session.
+ * @param {string} config.id - Session identifier.
+ * @param {string} config.createdAt - ISO timestamp for creation.
+ * @param {string} config.updatedAt - ISO timestamp for last update.
+ * @param {string} config.hostName - Host name running the game.
+ * @param {string} config.location - Location of the table.
+ * @param {string} config.datetime - ISO timestamp of the event.
+ * @param {number} config.expenses - Table expenses for the night.
+ * @param {number} config.reportedFinal - Reported final cash total.
+ * @param {string} config.currency - Currency code (USD/EUR/ILS).
+ * @param {string} config.status - Session status flag.
+ * @param {Array} config.players - Players participating in the session.
+ * @returns {Object} Normalized session payload.
+ */
 function sessionTemplate({
   id,
   createdAt,
@@ -43,6 +67,10 @@ function sessionTemplate({
   };
 }
 
+/**
+ * Seeds the local JSON file with three representative sessions.
+ * @returns {Promise<void>} Resolves once the data has been written.
+ */
 async function seed() {
   await fs.mkdir(DATA_DIR, { recursive: true });
 

@@ -66,14 +66,30 @@ let currentSession = null;
 let isRestoring = false;
 let saveTimeoutId = null;
 
+/**
+ * Normalizes the supplied currency code to one of the supported values.
+ * @param {string} code - Raw ISO currency code from user input.
+ * @returns {string} Sanitized currency code that defaults to USD when unknown.
+ */
 function sanitizeCurrency(code) {
   return code && code in CURRENCY_SYMBOLS ? code : 'USD';
 }
 
+/**
+ * Retrieves the currency symbol for the provided code or current selection.
+ * @param {string} [code] - Optional ISO code to resolve a symbol for.
+ * @returns {string} Currency symbol such as $, €, or ₪.
+ */
 function getCurrencySymbol(code = currencySelect?.value) {
   return CURRENCY_SYMBOLS[sanitizeCurrency(code)] ?? '$';
 }
 
+/**
+ * Formats a numeric amount using the active currency.
+ * @param {number|string} value - Monetary amount to render.
+ * @param {string} [currencyCode] - Optional ISO code overriding the selection.
+ * @returns {string} Localized currency string (e.g., $12.00).
+ */
 function formatCurrency(value, currencyCode = currencySelect?.value) {
   const number = Number(value) || 0;
   const code = sanitizeCurrency(currencyCode);
@@ -85,10 +101,18 @@ function formatCurrency(value, currencyCode = currencySelect?.value) {
   }).format(number);
 }
 
+/**
+ * Produces a unique identifier used for new player rows.
+ * @returns {string} Unique player identifier.
+ */
 function generateId() {
   return `player-${Math.random().toString(36).slice(2)}-${Date.now()}`;
 }
 
+/**
+ * Extracts the current player table into a structured list.
+ * @returns {Array<{id:string,name:string,buyins:number,final:number}>} Player data.
+ */
 function getPlayersData() {
   return Array.from(playersBody.querySelectorAll('tr')).map((row) => {
     const name = row.querySelector('.player-name').value.trim();
@@ -103,6 +127,10 @@ function getPlayersData() {
   });
 }
 
+/**
+ * Builds a serializable representation of the in-progress session form.
+ * @returns {{id:string|undefined,settings:Object,players:Array}} Session payload.
+ */
 function collectCurrentSessionData() {
   return {
     id: currentSession?.id,
@@ -119,6 +147,10 @@ function collectCurrentSessionData() {
   };
 }
 
+/**
+ * Syncs the draft form values into the in-memory session reference.
+ * @returns {void}
+ */
 function mergeCurrentSessionDraft() {
   if (!currentSession) return;
   const draft = collectCurrentSessionData();
@@ -139,6 +171,10 @@ function mergeCurrentSessionDraft() {
   }
 }
 
+/**
+ * Immediately persists the active session to the backend API.
+ * @returns {Promise<void>} Resolves once the save completes.
+ */
 async function saveSessionNow() {
   if (!currentSession) return;
   mergeCurrentSessionDraft();
@@ -173,6 +209,11 @@ async function saveSessionNow() {
   }
 }
 
+/**
+ * Debounces session persistence to prevent excessive writes while typing.
+ * @param {boolean} [immediate=false] - When true the save occurs without delay.
+ * @returns {void}
+ */
 function scheduleSave(immediate = false) {
   if (isRestoring || !currentSession) {
     return;
@@ -190,6 +231,10 @@ function scheduleSave(immediate = false) {
   }, SAVE_DEBOUNCE_MS);
 }
 
+/**
+ * Updates the session overview card with host/location/date information.
+ * @returns {void}
+ */
 function updateEventDetails() {
   displayHostEl.textContent = hostNameInput.value.trim() || '—';
   displayLocationEl.textContent = locationInput.value.trim() || '—';
@@ -212,6 +257,10 @@ function updateEventDetails() {
   displayExpensesEl.textContent = formatCurrency(expenseInput.value);
 }
 
+/**
+ * Recalculates aggregate totals and win/loss counts for the player table.
+ * @returns {void}
+ */
 function updateSummary() {
   const players = getPlayersData();
   const totalBuyins = players.reduce((sum, player) => sum + player.buyins, 0);
@@ -231,6 +280,10 @@ function updateSummary() {
   winsLossesEl.textContent = `${wins} / ${losses}`;
 }
 
+/**
+ * Refreshes the player registration URL shown to the host.
+ * @returns {void}
+ */
 function updatePlayerLink() {
   if (!playerLinkSpan) return;
   const url = new URL(window.location.href);
@@ -238,6 +291,11 @@ function updatePlayerLink() {
   playerLinkSpan.innerHTML = `<a href="${url.toString()}" target="_blank" rel="noopener">${url.toString()}</a>`;
 }
 
+/**
+ * Applies derived values to a player row whenever inputs change.
+ * @param {HTMLTableRowElement} row - Row element containing player inputs.
+ * @returns {void}
+ */
 function handlePlayerInputChange(row) {
   const buyinsInput = row.querySelector('.player-buyins');
   const finalInput = row.querySelector('.player-final');
@@ -273,6 +331,11 @@ function handlePlayerInputChange(row) {
   }
 }
 
+/**
+ * Clones a player row template and wires up its interactions.
+ * @param {Object} [player={}] - Optional persisted player data to hydrate.
+ * @returns {HTMLTableRowElement} Newly created table row.
+ */
 function createPlayerRow(player = {}) {
   const template = document.querySelector('#player-row-template');
   const row = template.content.firstElementChild.cloneNode(true);
@@ -314,18 +377,31 @@ function createPlayerRow(player = {}) {
   return row;
 }
 
+/**
+ * Appends a player row to the roster table.
+ * @param {Object} [player={}] - Optional player data to prefill inputs.
+ * @returns {HTMLTableRowElement} The appended row element.
+ */
 function addPlayerRow(player = {}) {
   const row = createPlayerRow(player);
   playersBody.appendChild(row);
   return row;
 }
 
+/**
+ * Forces all player rows to recompute their derived values.
+ * @returns {void}
+ */
 function refreshAllRows() {
   playersBody.querySelectorAll('tr').forEach((row) => {
     handlePlayerInputChange(row);
   });
 }
 
+/**
+ * Toggles interactive controls based on whether the session is closed.
+ * @returns {void}
+ */
 function updateSessionStatusUI() {
   const isClosed = sessionStatusSelect.value === 'closed';
   if (sessionStatusIndicator) {
@@ -347,6 +423,10 @@ function updateSessionStatusUI() {
   }
 }
 
+/**
+ * Replaces all currency symbol spans to match the active currency.
+ * @returns {void}
+ */
 function updateCurrencySymbols() {
   const symbol = getCurrencySymbol();
   document.querySelectorAll('.currency-symbol').forEach((span) => {
@@ -356,11 +436,19 @@ function updateCurrencySymbols() {
   refreshAllRows();
 }
 
+/**
+ * Registers open/close interactions for the admin settings drawer.
+ * @returns {void}
+ */
 function setupSettingsPanel() {
   if (!settingsToggle || !settingsPanel || !settingsOverlay) {
     return;
   }
 
+  /**
+   * Reveals the slide-out settings drawer.
+   * @returns {void}
+   */
   const openPanel = () => {
     settingsPanel.classList.add('open');
     settingsOverlay.classList.add('visible');
@@ -368,6 +456,10 @@ function setupSettingsPanel() {
     settingsOverlay.setAttribute('aria-hidden', 'false');
   };
 
+  /**
+   * Hides the slide-out settings drawer.
+   * @returns {void}
+   */
   const closePanel = () => {
     settingsPanel.classList.remove('open');
     settingsOverlay.classList.remove('visible');
@@ -388,6 +480,10 @@ function setupSettingsPanel() {
   settingsOverlay.addEventListener('click', closePanel);
 }
 
+/**
+ * Adjusts available controls when someone visits via the player link.
+ * @returns {void}
+ */
 function updateViewForRole() {
   if (isPlayerView) {
     settingsToggle?.classList.add('hidden');
@@ -407,6 +503,10 @@ function updateViewForRole() {
   }
 }
 
+/**
+ * Clears the current session form back to default values for the host.
+ * @returns {void}
+ */
 function resetCurrentSession() {
   if (!currentSession || isPlayerView) return;
   const confirmation = confirm('Clear host info and remove all players from this session?');
@@ -433,6 +533,10 @@ function resetCurrentSession() {
   scheduleSave(true);
 }
 
+/**
+ * Requests a fresh session object from the backend service.
+ * @returns {Promise<Object>} Created session payload.
+ */
 async function createSessionOnServer() {
   const response = await fetch(`${API_BASE}/sessions`, {
     method: 'POST',
@@ -449,6 +553,10 @@ async function createSessionOnServer() {
   return response.json();
 }
 
+/**
+ * Initializes a brand-new session after ensuring the current one is closed.
+ * @returns {Promise<void>} Resolves after the session is ready for editing.
+ */
 async function startNewSession() {
   if (!startSessionBtn || isPlayerView) return;
   if (currentSession && currentSession.settings?.sessionStatus !== 'closed') {
@@ -468,6 +576,11 @@ async function startNewSession() {
   }
 }
 
+/**
+ * Extracts a Date instance representing when a session occurred.
+ * @param {Object} session - Session object with datetime metadata.
+ * @returns {Date|null} Parsed date or null when unavailable.
+ */
 function getSessionDate(session) {
   const value = session?.settings?.datetime || session?.createdAt;
   if (!value) return null;
@@ -476,6 +589,11 @@ function getSessionDate(session) {
   return date;
 }
 
+/**
+ * Builds a human-friendly label for dropdowns (date + host).
+ * @param {Object} session - Session to format.
+ * @returns {string} Formatted label.
+ */
 function formatSessionLabel(session) {
   const date = getSessionDate(session);
   const host = session?.settings?.hostName?.trim();
@@ -485,12 +603,21 @@ function formatSessionLabel(session) {
   return host ? `${dateLabel} · ${host}` : dateLabel;
 }
 
+/**
+ * Resolves the calendar year for a session, or "Unknown" if missing.
+ * @param {Object} session - Session to inspect.
+ * @returns {string} Year label used in filters.
+ */
 function getSessionYear(session) {
   const date = getSessionDate(session);
   if (!date) return 'Unknown';
   return String(date.getFullYear());
 }
 
+/**
+ * Returns sessions ordered from newest to oldest by play date.
+ * @returns {Object[]} Sorted session list.
+ */
 function getSessionsSortedByDate() {
   return [...sessions].sort((a, b) => {
     const dateA = getSessionDate(a)?.getTime() ?? 0;
@@ -499,6 +626,10 @@ function getSessionsSortedByDate() {
   });
 }
 
+/**
+ * Generates a descending list of unique session years.
+ * @returns {string[]} Ordered year options.
+ */
 function getSortedYears() {
   const years = new Set();
   sessions.forEach((session) => {
@@ -511,6 +642,10 @@ function getSortedYears() {
   });
 }
 
+/**
+ * Repopulates scoreboard dropdowns with the latest sessions and years.
+ * @returns {void}
+ */
 function refreshScoreboardFilters() {
   if (!scoreboardScopeSelect) return;
 
@@ -557,6 +692,10 @@ function refreshScoreboardFilters() {
   handleScoreboardScopeChange();
 }
 
+/**
+ * Shows the relevant filter controls and refreshes the scoreboard.
+ * @returns {void}
+ */
 function handleScoreboardScopeChange() {
   if (!scoreboardScopeSelect) return;
   const scope = scoreboardScopeSelect.value;
@@ -569,6 +708,11 @@ function handleScoreboardScopeChange() {
   updateScoreboard();
 }
 
+/**
+ * Sorts player stat objects by profitability then alphabetically.
+ * @param {Array<Object>} stats - Player summaries to order.
+ * @returns {Array<Object>} Sorted stats.
+ */
 function sortPlayerStatsByNet(stats) {
   return [...stats].sort((a, b) => {
     if (b.totalNet !== a.totalNet) {
@@ -578,6 +722,11 @@ function sortPlayerStatsByNet(stats) {
   });
 }
 
+/**
+ * Determines a single currency for the current scoreboard scope.
+ * @param {Object[]} selectedSessions - Sessions feeding the scoreboard.
+ * @returns {string|null} Currency code when uniform, else null.
+ */
 function determineCurrencyForSessions(selectedSessions) {
   const currencies = new Set();
   selectedSessions.forEach((session) => {
@@ -590,6 +739,11 @@ function determineCurrencyForSessions(selectedSessions) {
   return null;
 }
 
+/**
+ * Aggregates player performance across the selected sessions.
+ * @param {Object[]} selectedSessions - Sessions to include in the tally.
+ * @returns {Array<Object>} Player stat objects with totals and counts.
+ */
 function computePlayerStats(selectedSessions) {
   const stats = new Map();
 
@@ -629,6 +783,12 @@ function computePlayerStats(selectedSessions) {
   }));
 }
 
+/**
+ * Formats a net profit/loss figure for scoreboard display.
+ * @param {number} value - Net result to format.
+ * @param {string|null} currencyForScope - Currency code or null if mixed.
+ * @returns {string} Human-readable net string.
+ */
 function formatNetValue(value, currencyForScope) {
   if (!Number.isFinite(value)) return '—';
   if (currencyForScope) {
@@ -637,6 +797,11 @@ function formatNetValue(value, currencyForScope) {
   return `${value.toFixed(2)} (mixed)`;
 }
 
+/**
+ * Displays a placeholder message for the movement section.
+ * @param {string} message - Text to show when no comparisons exist.
+ * @returns {void}
+ */
 function renderScoreboardMovesMessage(message) {
   if (!scoreboardMoves) return;
   scoreboardMoves.innerHTML = '';
@@ -646,6 +811,10 @@ function renderScoreboardMovesMessage(message) {
   scoreboardMoves.appendChild(placeholder);
 }
 
+/**
+ * Clears the scoreboard highlight bricks prior to re-rendering.
+ * @returns {void}
+ */
 function resetScoreboardSummary() {
   if (scoreboardWinnerName) {
     scoreboardWinnerName.textContent = '—';
@@ -664,6 +833,11 @@ function resetScoreboardSummary() {
   renderScoreboardMovesMessage('—');
 }
 
+/**
+ * Produces ordered rankings and placement maps for a session set.
+ * @param {Object[]} selectedSessions - Sessions representing the scope.
+ * @returns {{ordered:Array,rankings:Map}|null} Ranking data or null when empty.
+ */
 function buildRankingsForSessions(selectedSessions) {
   const stats = computePlayerStats(selectedSessions);
   if (stats.length === 0) {
@@ -677,6 +851,13 @@ function buildRankingsForSessions(selectedSessions) {
   return { ordered, rankings };
 }
 
+/**
+ * Explains how the leaderboard changed compared to the prior scope.
+ * @param {Array<Object>} currentStats - Ordered stats for the active scope.
+ * @param {{ordered:Array,rankings:Map}|null} previousData - Historical comparison data.
+ * @param {string} previousLabel - Label describing the comparison period.
+ * @returns {void}
+ */
 function summarizeRankChanges(currentStats, previousData, previousLabel) {
   if (!scoreboardMoves) return;
 
@@ -772,6 +953,10 @@ function summarizeRankChanges(currentStats, previousData, previousLabel) {
   }
 }
 
+/**
+ * Refreshes the scoreboard table, highlight bricks, and movement badges.
+ * @returns {void}
+ */
 function updateScoreboard() {
   if (!scoreboardTableBody || !scoreboardScopeSelect) return;
 
@@ -940,6 +1125,11 @@ function updateScoreboard() {
   scoreboardNote.textContent = `${contextLabel || 'Selected view'} · ${totalSessions} ${sessionWord}. ${currencyNote}`;
 }
 
+/**
+ * Loads the supplied session into the form and UI elements.
+ * @param {Object} session - Session data to display.
+ * @returns {void}
+ */
 function populateSession(session) {
   if (!session) return;
   isRestoring = true;
@@ -969,6 +1159,10 @@ function populateSession(session) {
   isRestoring = false;
 }
 
+/**
+ * Fetches all stored sessions and ensures one is available for editing.
+ * @returns {Promise<void>} Resolves after sessions are rendered.
+ */
 async function loadSessions() {
   try {
     const response = await fetch(`${API_BASE}/sessions`);
@@ -1001,12 +1195,22 @@ async function loadSessions() {
   }
 }
 
+/**
+ * Adds both input and change listeners to an element.
+ * @param {HTMLElement} element - Target field.
+ * @param {Function} handler - Callback reacting to updates.
+ * @returns {void}
+ */
 function attachInputListeners(element, handler) {
   if (!element) return;
   element.addEventListener('input', handler);
   element.addEventListener('change', handler);
 }
 
+/**
+ * Wires up all page-level event handlers for inputs and buttons.
+ * @returns {void}
+ */
 function initEventListeners() {
   attachInputListeners(hostNameInput, () => {
     updateEventDetails();
@@ -1057,6 +1261,10 @@ function initEventListeners() {
   scoreboardYearSelect?.addEventListener('change', updateScoreboard);
 }
 
+/**
+ * Entry point once the DOM is ready – prepares view and loads data.
+ * @returns {Promise<void>} Resolves when initialization is finished.
+ */
 async function init() {
   updateViewForRole();
   setupSettingsPanel();

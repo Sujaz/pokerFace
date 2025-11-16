@@ -1,4 +1,8 @@
 <!DOCTYPE html>
+<!--
+  Texas Hold'em Tracker main shell.
+  This markup renders the dashboard host view alongside the player table and scoreboard.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -7,18 +11,21 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- Floating hamburger icon that toggles the admin settings drawer -->
   <button id="settings-toggle" class="settings-toggle" aria-label="Open settings">
     <span></span>
     <span></span>
     <span></span>
   </button>
 
+  <!-- Slide-out settings menu used by the host to manage the night -->
   <aside id="settings-panel" class="settings-panel" aria-hidden="true">
     <div class="settings-header">
       <h2>Session Settings</h2>
       <button id="close-settings" class="ghost" aria-label="Close settings">Close</button>
     </div>
     <div class="settings-body">
+      <!-- Host profile, venue details, currency, and lifecycle controls -->
       <section aria-labelledby="host-settings-heading">
         <h3 id="host-settings-heading">Host details</h3>
         <label>
@@ -63,6 +70,7 @@
           </select>
         </label>
       </section>
+      <!-- Quick administrative actions for managing sessions and sharing the link -->
       <section aria-labelledby="admin-actions-heading">
         <h3 id="admin-actions-heading">Admin actions</h3>
         <button id="start-session-btn" class="primary">Start new session</button>
@@ -75,6 +83,7 @@
   <div id="settings-overlay" class="settings-overlay" aria-hidden="true"></div>
 
   <main class="app">
+    <!-- Hero banner communicates the Texas Hold'em focus and live status -->
     <header>
       <div>
         <h1>Texas Hold'em Night Tracker</h1>
@@ -83,6 +92,7 @@
       <div class="session-status" id="session-status-indicator">Session open</div>
     </header>
 
+    <!-- Host-facing overview of critical event metadata -->
     <section class="card" aria-labelledby="event-heading">
       <div class="section-header">
         <h2 id="event-heading">Event details</h2>
@@ -115,6 +125,7 @@
       <p>This is the player view. You can add yourself or update your numbers while the session is open.</p>
     </div>
 
+    <!-- Interactive roster of players with buy-ins and cash out totals -->
     <section class="card" aria-labelledby="players-heading">
       <div class="section-header">
         <h2 id="players-heading">Players</h2>
@@ -138,6 +149,7 @@
       </div>
     </section>
 
+    <!-- Aggregated totals help the host reconcile the table quickly -->
     <section class="card" aria-labelledby="summary-heading">
       <h2 id="summary-heading">Summary</h2>
       <div class="summary-grid" id="summary-grid" role="list">
@@ -169,6 +181,7 @@
       </div>
     </section>
 
+    <!-- Leaderboard capturing profitability, win rates, and momentum across scopes -->
     <section class="card" aria-labelledby="scoreboard-heading">
       <div class="section-header scoreboard-header">
         <h2 id="scoreboard-heading">Scoreboard</h2>
@@ -243,6 +256,7 @@
     </section>
   </main>
 
+  <!-- Template used to render additional player rows dynamically -->
   <template id="player-row-template">
     <tr>
       <td data-label="Player">
