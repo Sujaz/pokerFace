@@ -1,13 +1,18 @@
 const http = require('http');
 const fs = require('fs');
-const fsp = require('fs').promises;
 const path = require('path');
 const { URL } = require('url');
+const { loadEnv } = require('./loadEnv');
+const db = require('./db');
+
+loadEnv();
 
 const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
-const DATA_DIR = path.join(ROOT_DIR, 'data');
-const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
+const databaseReady = db.ensureDatabase().catch((error) => {
+  console.error('Database initialization failed:', error);
+  throw error;
+});
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -16,54 +21,6 @@ const MIME_TYPES = {
   '.json': 'application/json; charset=utf-8',
   '.ico': 'image/x-icon',
 };
-
-/**
- * Guarantees that the sessions directory and JSON file exist on disk.
- * @returns {Promise<void>} Resolves when the storage path is ready.
- */
-async function ensureDataFile() {
-  try {
-    await fsp.mkdir(DATA_DIR, { recursive: true });
-    await fsp.access(SESSIONS_FILE);
-  } catch (error) {
-    await fsp.writeFile(SESSIONS_FILE, JSON.stringify([], null, 2));
-  }
-}
-
-/**
- * Reads and parses the sessions collection from storage.
- * @returns {Promise<Array>} Stored sessions as JavaScript objects.
- */
-async function readSessions() {
-  await ensureDataFile();
-  const raw = await fsp.readFile(SESSIONS_FILE, 'utf-8');
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.error('Failed to parse sessions file. Resetting to empty array.', error);
-    await fsp.writeFile(SESSIONS_FILE, JSON.stringify([], null, 2));
-    return [];
-  }
-}
-
-/**
- * Serializes the provided sessions collection to disk.
- * @param {Array} sessions - Session list to persist.
- * @returns {Promise<void>} Resolves once the file is written.
- */
-async function writeSessions(sessions) {
-  await ensureDataFile();
-  await fsp.writeFile(SESSIONS_FILE, JSON.stringify(sessions, null, 2));
-}
-
-/**
- * Generates a unique identifier for new session records.
- * @returns {string} Newly generated session ID.
- */
-function generateId() {
-  return `session-${Math.random().toString(36).slice(2)}-${Date.now()}`;
-}
 
 /**
  * Sends a JSON response with the supplied status code and payload.
@@ -156,38 +113,24 @@ async function handleApiRequest(req, res, url) {
   const { pathname } = url;
 
   if (req.method === 'GET' && pathname === '/api/sessions') {
-    const sessions = await readSessions();
-    sendJson(res, 200, { sessions });
+    try {
+      const sessions = await db.getSessions();
+      sendJson(res, 200, { sessions });
+    } catch (error) {
+      console.error('Failed to fetch sessions', error);
+      sendJson(res, 500, { message: 'Unable to read sessions from the database' });
+    }
     return;
   }
 
   if (req.method === 'POST' && pathname === '/api/sessions') {
     try {
       const payload = await parseRequestBody(req);
-      const sessions = await readSessions();
-      const timestamp = new Date().toISOString();
-      const session = {
-        id: payload.id || generateId(),
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        settings: {
-          hostName: '',
-          location: '',
-          datetime: '',
-          expenses: '',
-          reportedFinal: '',
-          currency: 'USD',
-          sessionStatus: 'open',
-          ...(payload.settings || {}),
-        },
-        players: Array.isArray(payload.players) ? payload.players : [],
-      };
-      sessions.push(session);
-      await writeSessions(sessions);
+      const session = await db.createSession(payload);
       sendJson(res, 201, session);
     } catch (error) {
       console.error('Failed to create session', error);
-      sendJson(res, 400, { message: 'Invalid JSON payload' });
+      sendJson(res, 400, { message: 'Unable to create session' });
     }
     return;
   }
@@ -195,44 +138,34 @@ async function handleApiRequest(req, res, url) {
   const match = pathname.match(/^\/api\/sessions\/([^/]+)$/);
   if (match) {
     const sessionId = decodeURIComponent(match[1]);
-    const sessions = await readSessions();
-    const index = sessions.findIndex((item) => item.id === sessionId);
 
     if (req.method === 'GET') {
-      if (index === -1) {
-        sendJson(res, 404, { message: 'Session not found' });
-        return;
+      try {
+        const session = await db.getSessionById(sessionId);
+        if (!session) {
+          sendJson(res, 404, { message: 'Session not found' });
+          return;
+        }
+        sendJson(res, 200, session);
+      } catch (error) {
+        console.error('Failed to load session', error);
+        sendJson(res, 500, { message: 'Unable to read session from the database' });
       }
-      sendJson(res, 200, sessions[index]);
       return;
     }
 
     if (req.method === 'PUT') {
-      if (index === -1) {
-        sendJson(res, 404, { message: 'Session not found' });
-        return;
-      }
-
       try {
         const payload = await parseRequestBody(req);
-        const existing = sessions[index];
-        const updated = {
-          ...existing,
-          ...payload,
-          id: existing.id,
-          updatedAt: new Date().toISOString(),
-          settings: {
-            ...existing.settings,
-            ...(payload.settings || {}),
-          },
-          players: Array.isArray(payload.players) ? payload.players : existing.players,
-        };
-        sessions[index] = updated;
-        await writeSessions(sessions);
+        const updated = await db.updateSession(sessionId, payload);
+        if (!updated) {
+          sendJson(res, 404, { message: 'Session not found' });
+          return;
+        }
         sendJson(res, 200, updated);
       } catch (error) {
         console.error('Failed to update session', error);
-        sendJson(res, 400, { message: 'Invalid JSON payload' });
+        sendJson(res, 400, { message: 'Unable to update session' });
       }
       return;
     }
@@ -252,6 +185,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
     if (isApiRoute(url.pathname)) {
+      await databaseReady;
       await handleApiRequest(req, res, url);
       return;
     }

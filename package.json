@@ -5,6 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "seed": "node scripts/seedSessions.js"
+    "migrate": "node scripts/migrate.js",
+    "seed": "node scripts/seedSessions.js",
+    "import:sessions": "node scripts/importHistoricalSessions.js",
+    "test": "node --test"
   }
 }

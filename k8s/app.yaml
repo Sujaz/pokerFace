@@ -1,0 +1,142 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pokerface
+  labels:
+    app: pokerface
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pokerface-db-secret
+  namespace: pokerface
+  labels:
+    app: pokerface
+stringData:
+  POSTGRES_DB: pokerface
+  POSTGRES_USER: pokerface
+  POSTGRES_PASSWORD: supersecret
+  DATABASE_URL: postgres://pokerface:supersecret@pokerface-postgres.pokerface.svc.cluster.local:5432/pokerface
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pokerface-postgres
+  namespace: pokerface
+  labels:
+    app: pokerface-postgres
+spec:
+  type: LoadBalancer
+  selector:
+    app: pokerface-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: pokerface-postgres
+  namespace: pokerface
+spec:
+  serviceName: pokerface-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pokerface-postgres
+  template:
+    metadata:
+      labels:
+        app: pokerface-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: pokerface-db-secret
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pokerface-db-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pokerface-db-secret
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pokerface-app
+  namespace: pokerface
+  labels:
+    app: pokerface-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pokerface-app
+  template:
+    metadata:
+      labels:
+        app: pokerface-app
+    spec:
+      containers:
+        - name: pokerface-app
+          image: your-registry/pokerface:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pokerface-db-secret
+                  key: DATABASE_URL
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pokerface-app
+  namespace: pokerface
+  labels:
+    app: pokerface-app
+spec:
+  type: ClusterIP
+  selector:
+    app: pokerface-app
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000

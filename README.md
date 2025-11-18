@@ -1,32 +1,68 @@
 # Poker Night Tracker
 
-A full-stack poker night companion that lets hosts coordinate sessions, track cash movement, and review historical performance.
+A full-stack poker night companion that lets hosts coordinate sessions, track cash movement, and review historical performance. Session state now lives in PostgreSQL so it can be shared by multiple app replicas inside Kubernetes.
 
 ## Features
 
 - Slide-out settings drawer with host controls for name, location, date/time, preferred currency (USD, EUR, or ILS), reported totals, and table expenses.
 - Session lifecycle management: administrators can open/close a night, and once closed, player inputs are locked until a fresh session begins.
 - Shareable player registration mode (`?role=player`) so guests can enter their buy-ins and cash-out amounts while the event remains open.
-- Persistent session archive stored on disk (`data/sessions.json`) so every night is saved for future reference.
+- Persistent session archive stored in PostgreSQL so every night is saved for future reference.
 - Historical scoreboard that surfaces the most profitable player and win leaders per session, by year, or across all time, complete with filterable tables.
 - Real-time summary metrics: total buy-ins, total cash out, table delta (highlighted bright red when not balanced), expense totals, and cumulative wins/losses.
 
 ## Getting started
 
-No external dependencies are required—the server is built on Node's core modules. Populate the sample data, then launch the tracker:
+1. Copy the example environment file and set the `DATABASE_URL` that points at your PostgreSQL instance (the built-in scripts use the `psql` CLI, so make sure it is installed):
 
-```bash
-npm run seed   # creates data/sessions.json with 3 sessions and 5 active players
-npm start
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Start PostgreSQL locally or in Docker:
+
+   ```bash
+   docker run --rm -p 5432:5432 \
+     -e POSTGRES_PASSWORD=supersecret \
+     -e POSTGRES_USER=pokerface \
+     -e POSTGRES_DB=pokerface \
+     --name pokerface-db postgres:15-alpine
+   ```
+
+3. Run the schema migration and load seed data (optional):
+
+   ```bash
+   npm run migrate
+   npm run seed
+   ```
+
+4. Start the tracker and open http://localhost:3000:
+
+   ```bash
+   npm start
+   ```
+
+Sessions and player data are written to PostgreSQL. Each update is saved automatically while a session is open, and closing a session locks it into the archive so you can compare past results from the scoreboard.
+
+## Importing the historical Google Sheet
+
+Export the Google Sheet (`1mgjOcoFy3XRieHbR5LAjRwZdDKHzHLhpL5OtBIV5IDw`) to CSV and save it as `data/historicalSessions.csv`. The importer expects the following headers:
+
+```
+sessionId,playerId,playerName,buyins,final,hostName,location,datetime,expenses,reportedFinal,currency,status
 ```
 
-Then open http://localhost:3000 in your browser.
+Each row represents a player entry for a given session; the script groups rows by `sessionId` before inserting them. Once the CSV is in place, run:
 
-Sessions and player data are written to `data/sessions.json`. Each update is saved automatically while a session is open, and closing a session locks it into the archive so you can compare past results from the scoreboard. Re-run `npm run seed` at any time to restore the demo data.
+```bash
+npm run import:sessions
+```
+
+The repo includes `data/historicalSessions.sample.csv` that demonstrates the layout. Because the CI environment cannot reach Google Sheets directly, place the exported CSV in `data/historicalSessions.csv` before running the import command.
 
 ## Running with Docker
 
-You can also run the tracker in a container using the provided `Dockerfile`.
+You can also run the tracker in a container using the provided `Dockerfile`. The image bundles the `psql` client so it can reach an external PostgreSQL database defined by `DATABASE_URL`.
 
 1. Build the image:
 
@@ -34,15 +70,27 @@ You can also run the tracker in a container using the provided `Dockerfile`.
    docker build -t poker-night-tracker .
    ```
 
-2. Launch the container and expose port 3000. Mount a local directory to persist session history between runs:
+2. Launch the container and expose port 3000. Provide a `DATABASE_URL` so the app can talk to PostgreSQL (running locally or elsewhere):
 
    ```bash
-   docker run --rm -p 3000:3000 -v "$(pwd)/data:/app/data" poker-night-tracker
+   docker run --rm -p 3000:3000 \
+     -e DATABASE_URL=postgresql://pokerface:supersecret@host.docker.internal:5432/pokerface \
+     poker-night-tracker
    ```
 
-   On Windows PowerShell, use `${PWD}` instead of `$(pwd)` for the bind mount path.
+With the container running, browse to http://localhost:3000 to access the app.
 
-With the container running, browse to http://localhost:3000 to access the app. All session data remains in your mounted `data` directory so historical results survive container restarts.
+## Kubernetes deployment
+
+The `k8s/app.yaml` manifest now provisions the entire stack—namespace, shared secret, PostgreSQL `StatefulSet`, and the Poker Face deployment. The secret seeds a `DATABASE_URL` that already points at the in-cluster PostgreSQL service (`pokerface-postgres.pokerface.svc.cluster.local`), so the application talks to the database automatically as soon as both pods are up.
+
+After pushing your container image to a registry that the cluster can reach, apply the manifest in one step:
+
+```bash
+kubectl apply -f k8s/app.yaml
+```
+
+If you need to change the default credentials or database name, edit the `stringData` block inside `k8s/app.yaml` before applying. Kubernetes will regenerate the base64-encoded secret data automatically.
 
 ## Branching
 
