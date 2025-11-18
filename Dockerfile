@@ -12,7 +12,7 @@ RUN npm install --production
 COPY . .
 
 # Expose the port the app runs on
-EXPOSE 3000
+EXPOSE 80
 
 # Create volume mount point for persisted session data
 VOLUME ["/app/data"]
