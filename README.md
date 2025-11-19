@@ -84,7 +84,7 @@ With the container running, browse to http://localhost:3000 to access the app.
 
 The `k8s/app.yaml` manifest now provisions the entire stack—namespace, shared secret, PostgreSQL `StatefulSet`, and the Poker Face deployment. The secret seeds a `DATABASE_URL` that already points at the in-cluster PostgreSQL service (`pokerface-postgres.pokerface.svc.cluster.local`), so the application talks to the database automatically as soon as both pods are up.
 
-After pushing your container image to a registry that the cluster can reach, apply the manifest in one step:
+The manifest references the public `sujaz/poker:latest` image on Docker Hub, so you can apply it immediately without building a custom image. If you prefer to run your own build, push it to a registry the cluster can reach and edit the `image` field in `k8s/app.yaml` before deploying. Once you're ready, apply the manifest in one step:
 
 ```bash
 kubectl apply -f k8s/app.yaml

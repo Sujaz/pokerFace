@@ -102,7 +102,7 @@ spec:
     spec:
       containers:
         - name: pokerface-app
-          image: your-registry/pokerface:latest
+          image: sujaz/poker:latest
           imagePullPolicy: IfNotPresent
           env:
             - name: DATABASE_URL
