@@ -1,0 +1,14 @@
+sessionId,playerId,playerName,buyins,final,hostName,location,datetime,expenses,reportedFinal,currency,status
+session-2025-main,player-alex,Alex Morgan,400,525,Jamie Rivera,Skyline Loft,2025-01-15T20:00:00Z,150,2800,USD,open
+session-2025-main,player-bree,Bree Chen,300,180,Jamie Rivera,Skyline Loft,2025-01-15T20:00:00Z,150,2800,USD,open
+session-2025-main,player-cam,Cam Patel,250,420,Jamie Rivera,Skyline Loft,2025-01-15T20:00:00Z,150,2800,USD,open
+session-2025-main,player-dev,Devon Price,500,760,Jamie Rivera,Skyline Loft,2025-01-15T20:00:00Z,150,2800,USD,open
+session-2025-main,player-eden,Eden Solis,350,290,Jamie Rivera,Skyline Loft,2025-01-15T20:00:00Z,150,2800,USD,open
+session-2024-holiday,player-alex-2024,Alex Morgan,450,610,Jamie Rivera,Mountain Retreat,2024-12-19T20:30:00Z,120,2400,EUR,closed
+session-2024-holiday,player-bree-2024,Bree Chen,300,250,Jamie Rivera,Mountain Retreat,2024-12-19T20:30:00Z,120,2400,EUR,closed
+session-2024-holiday,player-fern-2024,Fernando Ortiz,280,360,Jamie Rivera,Mountain Retreat,2024-12-19T20:30:00Z,120,2400,EUR,closed
+session-2024-holiday,player-ida-2024,Ida Novak,320,260,Jamie Rivera,Mountain Retreat,2024-12-19T20:30:00Z,120,2400,EUR,closed
+session-2023-spring,player-cam-2023,Cam Patel,260,480,Jamie Rivera,Riverfront Condo,2023-04-09T19:45:00Z,95,2100,USD,closed
+session-2023-spring,player-dev-2023,Devon Price,420,340,Jamie Rivera,Riverfront Condo,2023-04-09T19:45:00Z,95,2100,USD,closed
+session-2023-spring,player-fern-2023,Fernando Ortiz,200,260,Jamie Rivera,Riverfront Condo,2023-04-09T19:45:00Z,95,2100,USD,closed
+session-2023-spring,player-gia-2023,Gia Walters,280,320,Jamie Rivera,Riverfront Condo,2023-04-09T19:45:00Z,95,2100,USD,closed

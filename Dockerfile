@@ -1,21 +1,14 @@
-# Use an official Node.js runtime as a parent image
 FROM node:20-alpine
 
-# Create app directory
+RUN apk add --no-cache postgresql-client
+
 WORKDIR /app
 
-# Install app dependencies
 COPY package*.json ./
-RUN npm install --production
+RUN npm install --omit=dev
 
-# Bundle app source
 COPY . .
 
-# Expose the port the app runs on
-EXPOSE 80
+EXPOSE 3000
 
-# Create volume mount point for persisted session data
-VOLUME ["/app/data"]
-
-# Run the application
 CMD ["npm", "start"]
