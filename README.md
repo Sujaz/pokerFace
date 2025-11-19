@@ -84,7 +84,7 @@ With the container running, browse to http://localhost:3000 to access the app.
 
 The `k8s/app.yaml` manifest now provisions the entire stack—namespace, shared secret, PostgreSQL `StatefulSet`, and the Poker Face deployment. The secret seeds a `DATABASE_URL` that already points at the in-cluster PostgreSQL service (`pokerface-postgres.pokerface.svc.cluster.local`), so the application talks to the database automatically as soon as both pods are up.
 
-The manifest references the public `sujaz/poker:latest` image on Docker Hub, so you can apply it immediately without building a custom image. If you prefer to run your own build, push it to a registry the cluster can reach and edit the `image` field in `k8s/app.yaml` before deploying. Once you're ready, apply the manifest in one step:
+The manifest references the public `sujaz/poker:latest` image on Docker Hub, so you can apply it immediately without building a custom image or running `docker login`. If you prefer to run your own build, push it to a registry the cluster can reach and edit the `image` field in `k8s/app.yaml` before deploying. Once you're ready, apply the manifest in one step:
 
 ```bash
 kubectl apply -f k8s/app.yaml
@@ -118,6 +118,17 @@ your kubeconfig is pointing at an API server that is unreachable (for example, D
    ```
 
 Once the API server is reachable, rerun `kubectl apply -f k8s/app.yaml` and the validation step will succeed without modifying the manifest.
+
+### Troubleshooting image pulls
+
+Pods should always pull the latest public image thanks to the `imagePullPolicy: Always` directive in `k8s/app.yaml`. If `kubectl describe pod` shows an `ImagePullBackOff` referencing `your-registry/pokerface:latest`, the cluster is still running an older deployment definition. Reapply the manifest (or delete the existing deployment before reapplying) so Kubernetes sees the updated `sujaz/poker:latest` reference:
+
+```bash
+kubectl delete deployment pokerface-app -n pokerface || true
+kubectl apply -f k8s/app.yaml
+```
+
+When the pods restart, `kubectl get pods -n pokerface` should report them as `Running` and `kubectl describe pod` will show pulls succeeding without any registry credentials.
 
 ## Branching
 
