@@ -92,6 +92,33 @@ kubectl apply -f k8s/app.yaml
 
 If you need to change the default credentials or database name, edit the `stringData` block inside `k8s/app.yaml` before applying. Kubernetes will regenerate the base64-encoded secret data automatically.
 
+### Troubleshooting Kubernetes validation
+
+The manifest itself does not require any extra flags, but `kubectl` must be connected to a running cluster so it can download the API server's OpenAPI schema during validation. If you see an error similar to the following:
+
+```
+error validating "app.yaml": error validating data: failed to download openapi: Get "https://127.0.0.1:51240/openapi/v2?timeout=32s": dial tcp 127.0.0.1:51240: connectex: No connection could be made because the target machine actively refused it
+```
+
+your kubeconfig is pointing at an API server that is unreachable (for example, Docker Desktop Kubernetes is stopped, or `minikube` is not running). Fix the context rather than editing `app.yaml`:
+
+1. Check your current context and ensure it matches the cluster you intend to use:
+
+   ```bash
+   kubectl config current-context
+   ```
+
+2. Start or connect to that cluster (`minikube start`, enabling Kubernetes in Docker Desktop, `kind create cluster`, etc.).
+
+3. Verify connectivity:
+
+   ```bash
+   kubectl cluster-info
+   kubectl get nodes
+   ```
+
+Once the API server is reachable, rerun `kubectl apply -f k8s/app.yaml` and the validation step will succeed without modifying the manifest.
+
 ## Branching
 
 All development now lives on the `main` branch. Previous working branches have been consolidated so you can pull directly from `main` to receive the latest tracker updates.
