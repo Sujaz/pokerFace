@@ -91,7 +91,7 @@ metadata:
   labels:
     app: pokerface-app
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: pokerface-app
@@ -102,7 +102,7 @@ spec:
     spec:
       containers:
         - name: pokerface-app
-          image: sujaz/poker:latest
+          image: sujaz/poker:0.0.2
           imagePullPolicy: Always
           env:
             - name: DATABASE_URL
@@ -133,7 +133,7 @@ metadata:
   labels:
     app: pokerface-app
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: pokerface-app
   ports:
